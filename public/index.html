@@ -124,8 +124,25 @@
 .account-link:focus-visible,.account-form input:focus-visible{outline:2px solid #000080;outline-offset:2px}
 @media(max-width:760px){.account-toolbar{left:4px;right:4px;transform:none;justify-content:space-between;gap:3px}.account-toolbar .account-username{max-width:25vw}.account-toolbar .account-save-status{display:none}.account-toolbar .bevel{padding:3px 5px}.account-inner{padding:8px}}
 
+/* NETSHIFT Online v1.2 — mandatory Windows 98 session ownership prompt */
+.session-handoff-overlay-v12{position:fixed;inset:0;z-index:200000;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(0,0,0,.42);font:13px Tahoma,Verdana,Arial,sans-serif;color:#111;pointer-events:auto}
+.session-handoff-overlay-v12[hidden]{display:none!important}
+.session-handoff-window-v12{width:min(440px,calc(100vw - 24px));background:#c0c0c0;border:2px solid;border-color:#fff #404040 #404040 #fff;box-shadow:4px 4px 0 #0009;padding:2px}
+.session-handoff-title-v12{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#000080;color:#fff;font-weight:bold;padding:5px 7px;user-select:none}
+.session-handoff-title-v12 .sysmark{font-size:14px;color:#fff;margin-right:6px}
+.session-handoff-body-v12{display:flex;gap:13px;padding:16px 13px 12px;align-items:flex-start}
+.session-handoff-icon-v12{flex:0 0 42px;height:42px;display:grid;place-items:center;background:#e6e6e6;border:2px solid;border-color:#fff #777 #777 #fff;font:bold 25px Tahoma,Verdana,Arial,sans-serif;color:#000080}
+.session-handoff-copy-v12{flex:1;min-width:0;line-height:1.5}
+.session-handoff-copy-v12 p{margin:0 0 9px}
+.session-handoff-copy-v12 strong{overflow-wrap:anywhere}
+.session-handoff-message-v12{background:#eee;border:1px inset #aaa;padding:6px;margin-top:8px;font-size:11px;line-height:1.4}
+.session-handoff-actions-v12{display:flex;justify-content:flex-end;gap:8px;padding:0 13px 13px}
+.session-handoff-actions-v12 .bevel{min-width:100px;font:13px Tahoma,Verdana,Arial,sans-serif}
+.session-handoff-actions-v12 .bevel:focus{outline:1px dotted #111;outline-offset:-5px}
+.session-handoff-actions-v12 .bevel:disabled{color:#777}
+@media(max-width:420px){.session-handoff-body-v12{padding:12px 8px 9px;gap:8px}.session-handoff-icon-v12{flex-basis:32px;height:32px;font-size:20px}.session-handoff-actions-v12{padding:0 8px 10px}.session-handoff-actions-v12 .bevel{min-width:0;flex:1}}
 
-/* NETSHIFT Online v1.1 — shared-network panel */
+/* NETSHIFT Online v1.2 — shared-network panel */
 .world-panel-v11{position:fixed;right:12px;bottom:86px;z-index:50000;width:min(570px,calc(100vw - 24px));max-height:min(76vh,760px);overflow:auto;background:#c0c0c0;border:2px solid;border-color:#fff #404040 #404040 #fff;box-shadow:4px 4px 0 #0006;color:#111;font:12px Tahoma,Verdana,Arial,sans-serif}
 .world-panel-v11[hidden]{display:none!important}
 .world-titlebar-v11{position:sticky;top:0;z-index:1;background:linear-gradient(90deg,#000080,#1084d0);color:#fff;padding:6px 8px;display:flex;align-items:center;justify-content:space-between;font-weight:bold}
@@ -150,6 +167,14 @@
 .world-actions-v11 button{font:11px Tahoma,Verdana,Arial,sans-serif}
 .world-footnote-v11{margin:8px 0 0;color:#555;font-size:10px;line-height:1.45}
 @media(max-width:540px){.world-panel-v11{right:6px;bottom:82px;width:calc(100vw - 12px);max-height:80vh}.world-columns-v11{grid-template-columns:1fr}.world-list-v11{max-height:115px}}
+.world-chat-v12{height:145px;overflow:auto;background:#fff;border:2px inset #aaa;padding:6px;font:12px/1.4 "Courier New",monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.world-chat-line-v12{padding:3px 0 5px;border-bottom:1px dotted #ccc}
+.world-chat-meta-v12{display:block;color:#666;font-size:10px;margin-bottom:2px}
+.world-chat-user-v12{color:#000080;font-weight:bold}
+.world-chat-form-v12{display:flex;gap:5px;margin-top:6px}
+.world-chat-form-v12 input{flex:1;min-width:0;padding:6px;border:2px inset #aaa;background:#fff;color:#111;font:12px Tahoma,Verdana,Arial,sans-serif}
+.world-chat-form-v12 button{min-width:64px}
+.world-chat-empty-v12{color:#666;font-style:italic}
 
 </style></head><body>
 <div class="wallpaper"></div><div class="desktop">
@@ -172,11 +197,18 @@
     <div class="world-status-v11"><span>Realtime link: <strong id="worldConnectionStatus" class="offline">Connecting…</strong></span><span>Operators online: <strong id="worldOnlineCount">0</strong></span></div>
     <div class="world-columns-v11">
       <section class="world-box-v11"><h3>OPERATORS ONLINE</h3><ul id="worldPlayersList" class="world-list-v11"><li>Loading operator list…</li></ul><p class="world-micro-v11">Only public usernames are shown.</p></section>
-      <section class="world-box-v11"><h3>SHARED PUBLIC HOSTS</h3><select id="worldTargetSelect" class="world-target-select-v11" aria-label="Shared target"></select><div id="worldTargetDetails" class="world-target-detail-v11">Loading shared target registry…</div><div class="world-actions-v11"><button class="bevel" id="worldProbeButton" type="button" onclick="netshiftWorldProbe()">Probe host</button><button class="bevel" type="button" onclick="netshiftWorldRefresh()">Refresh</button></div></section>
+      <section class="world-box-v11"><h3>SHARED PUBLIC HOSTS</h3><select id="worldTargetSelect" class="world-target-select-v11" aria-label="Shared target"></select><div id="worldTargetDetails" class="world-target-detail-v11">Loading shared target registry…</div><div class="world-actions-v11"><button class="bevel" id="worldProbeButton" type="button" onclick="netshiftWorldProbe()">Probe host</button><button class="bevel" id="worldBreachButton" type="button" onclick="netshiftWorldBreach()" disabled>Attempt intrusion</button><button class="bevel" type="button" onclick="netshiftWorldRefresh()">Refresh</button></div></section>
     </div>
     <h3 style="margin-top:10px">SHARED ACTIVITY LOG</h3>
     <div id="worldActivityList" class="world-activity-v11"><div class="event">Waiting for shared events…</div></div>
-    <p class="world-footnote-v11">Multiplayer foundation preview: public host metadata and server-recorded probe events are shared live and persist in the database. Hacking outcomes, in-game bank balances, player files and malware effects are still isolated in each player's sandbox at this stage.</p>
+    <h3 style="margin-top:10px">OPERATOR CHAT</h3>
+    <div id="worldChatMessages" class="world-chat-v12" aria-live="polite"><div class="world-chat-empty-v12">Chat history will appear here.</div></div>
+    <form id="worldChatForm" class="world-chat-form-v12">
+      <input id="worldChatInput" maxlength="300" autocomplete="off" aria-label="Operator chat message" placeholder="Message all connected operators…" required>
+      <button class="bevel" id="worldChatSendButton" type="submit">Send</button>
+    </form>
+    <p id="worldChatStatus" class="world-micro-v11" aria-live="polite">Messages are visible to signed-in operators and saved in the shared world history.</p>
+    <p class="world-footnote-v11">Multiplayer foundation preview: operator presence, chat, host probes and shared host compromise are server-authoritative and persistent. In-game bank balances, software inventory, player files and malware effects remain private sandbox state.</p>
   </div>
 </div>
 <div id="authOverlay" class="account-overlay" role="dialog" aria-modal="true" aria-labelledby="authTitle">
@@ -206,9 +238,25 @@
         <button class="bevel" type="submit">Create account</button>
         <p class="account-small">Already registered? <button class="account-link" type="button" onclick="showAccountForm('login')">Return to sign in</button></p>
       </form>
+      <button id="cancelHandoffButton" class="bevel" type="button" onclick="netshiftCancelHandoff()" hidden style="margin-top:8px">Cancel sign-in request</button>
       <p class="account-small" style="margin-bottom:0">Use a unique password. Password recovery and email verification are not included in this first build; save your credentials safely.</p>
     </div>
   </div>
+</div>
+<div id="sessionHandoffOverlay" class="session-handoff-overlay-v12" hidden role="alertdialog" aria-modal="true" aria-labelledby="sessionHandoffTitle" aria-describedby="sessionHandoffBody">
+  <section class="session-handoff-window-v12">
+    <div class="session-handoff-title-v12"><span id="sessionHandoffTitle"><span class="sysmark">▣</span>NETSHIFT Account In Use</span><span>Windows 98</span></div>
+    <div class="session-handoff-body-v12">
+      <div class="session-handoff-icon-v12" aria-hidden="true">?</div>
+      <div id="sessionHandoffBody" class="session-handoff-copy-v12">
+        <p><strong>Another sign-in is requesting this NETSHIFT ID.</strong></p>
+        <p><strong id="sessionHandoffRequester">Another operator</strong> entered the correct account credentials from a different session.</p>
+        <p><b>Yes</b> relinquishes access here and transfers the account to the requesting session. <b>No</b> denies the request and keeps this session active.</p>
+        <div id="sessionHandoffMessage" class="session-handoff-message-v12">Choose Yes or No before continuing.</div>
+      </div>
+    </div>
+    <div class="session-handoff-actions-v12"><button class="bevel" id="sessionHandoffYes" type="button" onclick="netshiftDecideHandoff('yes')">Yes</button><button class="bevel" id="sessionHandoffNo" type="button" onclick="netshiftDecideHandoff('no')">No</button></div>
+  </section>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -4757,8 +4805,14 @@ let NETSHIFT_LOGOUT_BUSY = false;
 let NETSHIFT_SAVE_REVISION = 0;
 let NETSHIFT_SAVE_CONFLICTED = false;
 let NETSHIFT_WORLD_SOCKET = null;
-let NETSHIFT_WORLD_DATA = {players:[], targets:[], events:[]};
+let NETSHIFT_WORLD_DATA = {players:[], targets:[], events:[], chat:[]};
 let NETSHIFT_WORLD_PROBE_BUSY = false;
+let NETSHIFT_WORLD_BREACH_BUSY = false;
+let NETSHIFT_SESSION_HEARTBEAT = null;
+let NETSHIFT_ACTIVE_HANDOFF = null;
+let NETSHIFT_HANDOFF_POLL_ID = null;
+let NETSHIFT_HANDOFF_POLL_TIMER = null;
+let NETSHIFT_SESSION_ENDING = false;
 
 function netshiftSetAuthMessage(message, kind="") {
   const el = $("authMessage");
@@ -4787,7 +4841,8 @@ async function netshiftApi(path, options={}) {
   try { payload = await response.json(); } catch (_) { /* non-JSON response */ }
   if (!response.ok) {
     const error = new Error(payload.error || `Request failed (${response.status}).`);
-    error.status = response.status; throw error;
+    error.status = response.status; error.code = payload.code || null;
+    throw error;
   }
   return payload;
 }
@@ -4795,7 +4850,9 @@ function netshiftSetSaveStatus(text) {
   const el = $("cloudSaveStatus"); if (el) el.textContent = text;
 }
 function netshiftSetAuthenticated(user) {
+  NETSHIFT_SESSION_ENDING = false;
   window.NETSHIFT_USER = user;
+  netshiftStartSessionHeartbeat();
   $("accountUsername").textContent = user.username;
   $("accountToolbar").hidden = false;
   $("authOverlay").hidden = true;
@@ -4852,8 +4909,9 @@ function netshiftSnapshot() {
   };
 }
 function netshiftFingerprint(snapshot) { const comparable = { ...snapshot, savedAt: null }; delete comparable.baseRevision; return JSON.stringify(comparable); }
-async function netshiftSave({force=false, quiet=false, keepalive=false}={}) {
+async function netshiftSave({force=false, quiet=false, keepalive=false, allowHandoff=false}={}) {
   if (!window.NETSHIFT_USER || NETSHIFT_SAVE_BUSY) return false;
+  if (NETSHIFT_ACTIVE_HANDOFF && !allowHandoff) return false;
   if (NETSHIFT_SAVE_CONFLICTED) {
     netshiftSetSaveStatus("Save conflict · load latest");
     if (!quiet) toast("This account's save changed in another session. Use Load latest before saving again.");
@@ -4949,6 +5007,184 @@ async function netshiftAfterAuth(user) {
     if (NETSHIFT_LAST_SAVED_FINGERPRINT !== "__save_read_failed__" && !NETSHIFT_SAVE_CONFLICTED) netshiftSave({quiet:true});
   }, 4000);
 }
+function netshiftStartSessionHeartbeat() {
+  if (NETSHIFT_SESSION_HEARTBEAT) clearInterval(NETSHIFT_SESSION_HEARTBEAT);
+  NETSHIFT_SESSION_HEARTBEAT = setInterval(async () => {
+    if (!window.NETSHIFT_USER || NETSHIFT_SESSION_ENDING) return;
+    try { await netshiftApi('/api/auth/heartbeat', {method:'POST', body:'{}'}); }
+    catch (error) {
+      if (error.code === 'SESSION_REVOKED' || error.status === 401) {
+        netshiftForceSessionEnd('This NETSHIFT ID is no longer owned by this browser session. Sign in again to request access.');
+      }
+    }
+  }, 25000);
+}
+function netshiftStopSessionHeartbeat() {
+  if (NETSHIFT_SESSION_HEARTBEAT) clearInterval(NETSHIFT_SESSION_HEARTBEAT);
+  NETSHIFT_SESSION_HEARTBEAT = null;
+}
+function netshiftSetHandoffWaiting(waiting) {
+  for (const formId of ['loginForm','registerForm']) {
+    const form = $(formId); if (!form) continue;
+    for (const control of form.querySelectorAll('input,button')) control.disabled = !!waiting;
+  }
+  const cancel = $('cancelHandoffButton'); if (cancel) cancel.hidden = !waiting;
+}
+function netshiftBeginHandoffPoll(handoffId) {
+  if (!handoffId) return;
+  if (NETSHIFT_HANDOFF_POLL_TIMER) clearTimeout(NETSHIFT_HANDOFF_POLL_TIMER);
+  NETSHIFT_HANDOFF_POLL_ID = handoffId;
+  netshiftSetHandoffWaiting(true);
+  const poll = async () => {
+    if (NETSHIFT_HANDOFF_POLL_ID !== handoffId) return;
+    try {
+      const result = await netshiftApi(`/api/auth/handoff/${encodeURIComponent(handoffId)}`, {method:'GET'});
+      if (result.status === 'approved') {
+        const completed = await netshiftApi(`/api/auth/handoff/${encodeURIComponent(handoffId)}/complete`, {method:'POST', body:'{}'});
+        NETSHIFT_HANDOFF_POLL_ID = null;
+        netshiftSetHandoffWaiting(false);
+        $('cancelHandoffButton').hidden = true;
+        await netshiftAfterAuth(completed.user);
+        return;
+      }
+      if (['denied','expired','cancelled'].includes(result.status)) {
+        NETSHIFT_HANDOFF_POLL_ID = null;
+        netshiftSetHandoffWaiting(false);
+        $('cancelHandoffButton').hidden = true;
+        showAccountForm('login');
+        netshiftSetAuthMessage(result.message || 'The sign-in request ended. Try again when ready.', result.status === 'denied' ? 'error' : 'success');
+        return;
+      }
+      netshiftSetAuthMessage(`Waiting for the active session to respond to the sign-in request for ${$('loginUsername').value.trim() || 'this account'}. Keep this page open.`, 'success');
+      NETSHIFT_HANDOFF_POLL_TIMER = setTimeout(poll, 1400);
+    } catch (error) {
+      if (error.status === 401 || error.code === 'HANDOFF_SESSION_INVALID') {
+        NETSHIFT_HANDOFF_POLL_ID = null;
+        netshiftSetHandoffWaiting(false);
+        $('cancelHandoffButton').hidden = true;
+        showAccountForm('login');
+        netshiftSetAuthMessage('The pending sign-in request ended. Submit the login form to try again.', 'error');
+        return;
+      }
+      netshiftSetAuthMessage('Waiting for approval; the server could not be reached just now. Retrying…', 'success');
+      NETSHIFT_HANDOFF_POLL_TIMER = setTimeout(poll, 2200);
+    }
+  };
+  poll();
+}
+async function netshiftCancelHandoff() {
+  const id = NETSHIFT_HANDOFF_POLL_ID;
+  if (!id) return;
+  const cancel = $('cancelHandoffButton'); if (cancel) { cancel.disabled = true; cancel.textContent = 'Cancelling…'; }
+  try { await netshiftApi(`/api/auth/handoff/${encodeURIComponent(id)}/cancel`, {method:'POST', body:'{}'}); }
+  catch (error) { console.warn('Could not cancel handoff request:', error.message); }
+  if (NETSHIFT_HANDOFF_POLL_TIMER) clearTimeout(NETSHIFT_HANDOFF_POLL_TIMER);
+  NETSHIFT_HANDOFF_POLL_TIMER = null; NETSHIFT_HANDOFF_POLL_ID = null;
+  netshiftSetHandoffWaiting(false);
+  if (cancel) { cancel.disabled = false; cancel.textContent = 'Cancel sign-in request'; cancel.hidden = true; }
+  showAccountForm('login');
+  netshiftSetAuthMessage('Sign-in request cancelled. Your current account session, if any, was not changed.', 'success');
+}
+function netshiftShowHandoffModal(payload) {
+  if (!window.NETSHIFT_USER || !payload?.handoffId) return;
+  NETSHIFT_ACTIVE_HANDOFF = { id: payload.handoffId, requester: String(payload.requestingUsername || 'another operator'), expired: false, busy: false };
+  $('sessionHandoffRequester').textContent = NETSHIFT_ACTIVE_HANDOFF.requester;
+  $('sessionHandoffMessage').textContent = `${NETSHIFT_ACTIVE_HANDOFF.requester} has entered the correct password for this NETSHIFT ID from a different session. Choose Yes to relinquish access, or No to keep playing here.`;
+  $('sessionHandoffYes').disabled = false; $('sessionHandoffNo').disabled = false;
+  $('sessionHandoffYes').textContent = 'Yes'; $('sessionHandoffNo').textContent = 'No';
+  $('sessionHandoffOverlay').hidden = false;
+  document.body.style.overflow = 'hidden';
+  $('sessionHandoffNo').focus();
+}
+function netshiftHandoffExpired(payload) {
+  if (!NETSHIFT_ACTIVE_HANDOFF || (payload?.handoffId && payload.handoffId !== NETSHIFT_ACTIVE_HANDOFF.id)) return;
+  NETSHIFT_ACTIVE_HANDOFF.expired = true;
+  $('sessionHandoffMessage').textContent = payload?.cancelled
+    ? 'The requesting session cancelled the sign-in. Select No to dismiss this notice and keep your current session.'
+    : 'This request has expired. Select No to dismiss this notice and keep your current session. Access will not be transferred by choosing Yes now.';
+  $('sessionHandoffYes').disabled = true;
+  $('sessionHandoffNo').disabled = false;
+  $('sessionHandoffNo').focus();
+}
+function netshiftHideHandoffModal() {
+  NETSHIFT_ACTIVE_HANDOFF = null;
+  $('sessionHandoffOverlay').hidden = true;
+  document.body.style.overflow = '';
+}
+async function netshiftDecideHandoff(decision) {
+  const handoff = NETSHIFT_ACTIVE_HANDOFF;
+  if (!handoff || handoff.busy) return;
+  if (handoff.expired && decision === 'yes') return;
+  handoff.busy = true;
+  $('sessionHandoffYes').disabled = true; $('sessionHandoffNo').disabled = true;
+  $('sessionHandoffMessage').textContent = decision === 'yes' ? 'Saving current progress and transferring access…' : 'Declining the sign-in request…';
+  try {
+    if (decision === 'yes') {
+      const saved = await netshiftSave({force:true, quiet:true, allowHandoff:true});
+      if (!saved) {
+        handoff.busy = false; $('sessionHandoffYes').disabled = !!handoff.expired; $('sessionHandoffNo').disabled = false;
+        $('sessionHandoffMessage').textContent = 'A final save could not be confirmed. Try Yes again when the connection is stable, or select No to keep this session.';
+        return;
+      }
+    }
+    await netshiftApi(`/api/auth/handoff/${encodeURIComponent(handoff.id)}/respond`, {method:'POST', body:JSON.stringify({decision})});
+    if (decision === 'yes') {
+      netshiftHideHandoffModal();
+      netshiftForceSessionEnd('You relinquished this session. The requesting sign-in can now continue.');
+    } else {
+      netshiftHideHandoffModal();
+      toast('Sign-in denied. This session remains active.');
+    }
+  } catch (error) {
+    if (error.status === 410 || error.code === 'HANDOFF_EXPIRED') {
+      handoff.busy = false;
+      netshiftHandoffExpired({handoffId:handoff.id});
+      return;
+    }
+    if (error.code === 'SESSION_REVOKED') {
+      netshiftForceSessionEnd('This session no longer owns the NETSHIFT ID. Sign in again to request access.');
+      return;
+    }
+    handoff.busy = false; $('sessionHandoffYes').disabled = !!handoff.expired; $('sessionHandoffNo').disabled = false;
+    $('sessionHandoffMessage').textContent = 'The decision could not be sent to the server. Check the connection and choose again.';
+  }
+}
+function netshiftForceSessionEnd(message) {
+  if (NETSHIFT_SESSION_ENDING) return;
+  NETSHIFT_SESSION_ENDING = true;
+  netshiftHideHandoffModal();
+  netshiftStopSessionHeartbeat();
+  netshiftWorldDisconnect();
+  if (NETSHIFT_SAVE_TIMER) clearInterval(NETSHIFT_SAVE_TIMER);
+  NETSHIFT_SAVE_TIMER = null;
+  window.NETSHIFT_USER = null;
+  NETSHIFT_LAST_SAVED_FINGERPRINT = '';
+  NETSHIFT_SAVE_REVISION = 0; NETSHIFT_SAVE_CONFLICTED = false;
+  const reloadButton = $('cloudSaveReloadButton'); if (reloadButton) reloadButton.hidden = true;
+  $('worldPanel').hidden = true;
+  $('accountToolbar').hidden = true;
+  $('authOverlay').hidden = false;
+  netshiftResetGameState(); go('whois.com', false);
+  document.title = 'NETSHIFT Online';
+  showAccountForm('login');
+  netshiftSetAuthMessage(message || 'This account session has ended. Sign in again to continue.', 'error');
+}
+document.addEventListener('keydown', event => {
+  if ($('sessionHandoffOverlay')?.hidden === false) {
+    if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); return; }
+    if (event.key === 'Tab') {
+      const buttons = [$('sessionHandoffYes'), $('sessionHandoffNo')].filter(button => button && !button.disabled);
+      if (!buttons.length) { event.preventDefault(); event.stopImmediatePropagation(); return; }
+      const first = buttons[0], last = buttons[buttons.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+    // Prevent keyboard shortcuts and handlers underneath the blocking prompt from
+    // continuing the simulation. Native Enter/Space button activation remains available.
+    event.stopImmediatePropagation();
+  }
+}, true);
+
 async function netshiftHandleAuthSubmit(event, mode) {
   event.preventDefault();
   const isRegister = mode === "register";
@@ -4965,11 +5201,16 @@ async function netshiftHandleAuthSubmit(event, mode) {
       method:"POST", body:JSON.stringify({username,password})
     });
     $("loginPassword").value = ""; $("registerPassword").value = ""; $("registerPasswordConfirm").value = "";
+    if (result.handoffRequired) {
+      netshiftSetAuthMessage(`This NETSHIFT ID is already active in another browser session. A Windows 98-style prompt has been sent to that session; this sign-in will continue only if it chooses Yes.`, "success");
+      netshiftBeginHandoffPoll(result.handoffId);
+      return;
+    }
     await netshiftAfterAuth(result.user);
   } catch (error) {
     netshiftSetAuthMessage(error.message, "error");
   } finally {
-    if (submit) { submit.disabled = false; submit.textContent = isRegister ? "Create account" : "Connect"; }
+    if (submit) { submit.textContent = isRegister ? "Create account" : "Connect"; submit.disabled = !!NETSHIFT_HANDOFF_POLL_ID; }
   }
 }
 async function netshiftLogout() {
@@ -4982,6 +5223,7 @@ async function netshiftLogout() {
   finally {
     NETSHIFT_LOGOUT_BUSY = false;
     netshiftWorldDisconnect();
+    netshiftStopSessionHeartbeat();
     if (NETSHIFT_SAVE_TIMER) clearInterval(NETSHIFT_SAVE_TIMER);
     NETSHIFT_SAVE_TIMER = null; window.NETSHIFT_USER = null; NETSHIFT_LAST_SAVED_FINGERPRINT = "";
     NETSHIFT_SAVE_REVISION = 0; NETSHIFT_SAVE_CONFLICTED = false;
@@ -4996,7 +5238,12 @@ async function netshiftLogout() {
 }
 $("loginForm").addEventListener("submit", event => netshiftHandleAuthSubmit(event, "login"));
 $("registerForm").addEventListener("submit", event => netshiftHandleAuthSubmit(event, "register"));
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") netshiftSave({quiet:true}); });
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") netshiftSave({quiet:true});
+  else if (window.NETSHIFT_USER) netshiftApi('/api/auth/heartbeat', {method:'POST', body:'{}'}).catch(error => {
+    if (error.code === 'SESSION_REVOKED' || error.status === 401) netshiftForceSessionEnd('This NETSHIFT ID is no longer owned by this browser session. Sign in again to request access.');
+  });
+});
 window.addEventListener("pagehide", () => {
   // Avoid racing the normal autosave with a second request using the same revision.
   if (!window.NETSHIFT_USER || NETSHIFT_SAVE_BUSY || NETSHIFT_SAVE_CONFLICTED) return;
@@ -5016,7 +5263,13 @@ window.addEventListener("pagehide", () => {
   try {
     const result = await netshiftApi("/api/auth/me", {method:"GET"});
     if (result.user) await netshiftAfterAuth(result.user);
-    else { $("authOverlay").hidden = false; showAccountForm("login"); }
+    else {
+      $("authOverlay").hidden = false; showAccountForm("login");
+      if (result.pendingHandoffId) {
+        netshiftSetAuthMessage('A sign-in request is already waiting for the active session to respond. Keep this page open.', 'success');
+        netshiftBeginHandoffPoll(result.pendingHandoffId);
+      } else if (result.code === 'SESSION_REVOKED') netshiftSetAuthMessage(result.message || 'This browser no longer owns the account. Sign in to request access.', 'error');
+    }
   } catch (error) {
     $("authOverlay").hidden = false; showAccountForm("login");
     netshiftSetAuthMessage("Unable to reach the NETSHIFT backend. Check your connection or ask the site administrator to check the server and database configuration. " + error.message, "error");
@@ -5025,7 +5278,7 @@ window.addEventListener("pagehide", () => {
 
 
 
-/* NETSHIFT Online v1.1 — multiplayer-compatible shared-world client. */
+/* NETSHIFT Online v1.2 — single-session ownership and shared-world client. */
 async function netshiftResolveSaveConflict() {
   if (!window.NETSHIFT_USER || !NETSHIFT_SAVE_CONFLICTED) return;
   const btn = $("cloudSaveReloadButton"); if (btn) { btn.disabled = true; btn.textContent = "Loading…"; }
@@ -5065,7 +5318,18 @@ function netshiftWorldRenderTargetDetails() {
   const target = NETSHIFT_WORLD_DATA.targets.find(item => item.slug === select.value) || NETSHIFT_WORLD_DATA.targets[0];
   if (!target) { detail.textContent = "No shared hosts available."; return; }
   if (select.value !== target.slug) select.value = target.slug;
-  detail.innerHTML = `<strong>${esc(target.name)}</strong><br><span class="world-micro-v11">${esc(target.domain)} · Firewall L${Number(target.securityLevel)}</span><p style="margin:5px 0">${esc(target.description)}</p><span class="world-micro-v11">Server-recorded probes: ${Number(target.probeCount || 0)}${target.lastProbedByUsername ? ` · Last probe by ${esc(target.lastProbedByUsername)}` : ''}</span>`;
+  const isMine = !!window.NETSHIFT_USER && target.compromisedByUsername === window.NETSHIFT_USER.username;
+  const ownerStatus = target.compromisedByUsername
+    ? `COMPROMISED · CONTROLLED BY ${esc(target.compromisedByUsername)}${isMine ? ' (YOU)' : ''}`
+    : 'STATUS · UNCLAIMED';
+  detail.innerHTML = `<strong>${esc(target.name)}</strong><br><span class="world-micro-v11">${esc(target.domain)} · Firewall L${Number(target.securityLevel)}</span><p style="margin:5px 0">${esc(target.description)}</p><span class="world-micro-v11">${ownerStatus}</span><br><span class="world-micro-v11">Global probes: ${Number(target.probeCount || 0)}${target.lastProbedByUsername ? ` · Last probe by ${esc(target.lastProbedByUsername)}` : ''}</span><br><span class="world-micro-v11">Your probes: ${Number(target.myProbeCount || 0)} · Intrusion attempts are server-rolled; claimed hosts are harder to seize.</span>`;
+  const breachButton = $('worldBreachButton');
+  if (breachButton) {
+    const ready = Number(target.myProbeCount || 0) > 0 && !isMine && NETSHIFT_WORLD_BREACH_BUSY === false;
+    breachButton.disabled = !ready;
+    breachButton.title = isMine ? 'You already control this host.' : (Number(target.myProbeCount || 0) < 1 ? 'Probe this host once before attempting intrusion.' : 'Attempt a server-validated intrusion.');
+    breachButton.textContent = isMine ? 'Host controlled by you' : 'Attempt intrusion';
+  }
 }
 function netshiftWorldRenderTargets() {
   const select = $("worldTargetSelect");
@@ -5086,6 +5350,42 @@ function netshiftWorldRenderEvents(events=[]) {
     return `<div class="event"><span class="event-time">${esc(time)} · ${esc(event.actorUsername)} · ${esc(event.type)}</span>${esc(event.summary)}</div>`;
   }).join("");
 }
+function netshiftWorldRenderChat(messages=[], scrollToBottom=false) {
+  const container = $('worldChatMessages');
+  if (!container) return;
+  const clean = Array.isArray(messages) ? messages.slice(-40) : [];
+  if (!clean.length) { container.innerHTML = '<div class="world-chat-empty-v12">No chat messages yet. Say hello to the other operators.</div>'; return; }
+  container.innerHTML = clean.map(message => {
+    let time = 'RECENT';
+    try { time = new Date(message.createdAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); } catch (_) {}
+    return `<div class="world-chat-line-v12"><span class="world-chat-meta-v12">[${esc(time)}] <span class="world-chat-user-v12">${esc(message.username)}</span></span>${esc(message.message)}</div>`;
+  }).join('');
+  if (scrollToBottom) container.scrollTop = container.scrollHeight;
+}
+async function netshiftWorldSendChat(event) {
+  if (event) event.preventDefault();
+  const input = $('worldChatInput'), button = $('worldChatSendButton'), status = $('worldChatStatus');
+  const message = (input?.value || '').trim();
+  if (!message) return;
+  if (!NETSHIFT_WORLD_SOCKET?.connected) { if (status) status.textContent = 'Chat offline. Reconnect to the shared network and retry.'; return; }
+  if (button) { button.disabled = true; button.textContent = 'Sending…'; }
+  if (status) status.textContent = 'Saving message…';
+  try {
+    const ack = await new Promise((resolve, reject) => {
+      NETSHIFT_WORLD_SOCKET.timeout(6000).emit('world:chat-send', {message}, (error, response) => error ? reject(error) : resolve(response));
+    });
+    if (!ack?.ok) throw new Error(ack?.error || 'Message could not be sent.');
+    input.value = '';
+    if (status) status.textContent = 'Message saved to shared chat.';
+    input.focus();
+  } catch (error) {
+    if (status) status.textContent = error.message || 'Chat send failed. Please retry.';
+  } finally {
+    if (button) { button.disabled = false; button.textContent = 'Send'; }
+  }
+}
+$('worldChatForm')?.addEventListener('submit', netshiftWorldSendChat);
+
 async function netshiftWorldRefresh() {
   if (!window.NETSHIFT_USER) return;
   try {
@@ -5093,11 +5393,13 @@ async function netshiftWorldRefresh() {
     NETSHIFT_WORLD_DATA = {
       players: Array.isArray(snapshot.players) ? snapshot.players : [],
       targets: Array.isArray(snapshot.targets) ? snapshot.targets : [],
-      events: Array.isArray(snapshot.events) ? snapshot.events : []
+      events: Array.isArray(snapshot.events) ? snapshot.events : [],
+      chat: Array.isArray(snapshot.chat) ? snapshot.chat : []
     };
     netshiftWorldRenderPlayers(NETSHIFT_WORLD_DATA.players);
     netshiftWorldRenderTargets();
     netshiftWorldRenderEvents(NETSHIFT_WORLD_DATA.events);
+    netshiftWorldRenderChat(NETSHIFT_WORLD_DATA.chat);
     if (!NETSHIFT_WORLD_SOCKET?.connected) netshiftWorldSetConnection("Realtime unavailable", false);
   } catch (error) {
     netshiftWorldSetConnection("Network error", false);
@@ -5136,15 +5438,28 @@ function netshiftWorldConnect() {
   socket.on("world:target-updated", target => {
     if (!target || typeof target.slug !== "string") return;
     const idx = NETSHIFT_WORLD_DATA.targets.findIndex(item => item.slug === target.slug);
-    if (idx >= 0) NETSHIFT_WORLD_DATA.targets[idx] = target;
+    if (idx >= 0) NETSHIFT_WORLD_DATA.targets[idx] = { ...NETSHIFT_WORLD_DATA.targets[idx], ...target };
     else NETSHIFT_WORLD_DATA.targets.push(target);
     netshiftWorldRenderTargets();
   });
+  socket.on("world:chat-message", message => {
+    if (!message || typeof message.message !== "string" || typeof message.username !== "string") return;
+    NETSHIFT_WORLD_DATA.chat = [...NETSHIFT_WORLD_DATA.chat.filter(item => item.id !== message.id), message].slice(-40);
+    netshiftWorldRenderChat(NETSHIFT_WORLD_DATA.chat, true);
+  });
+  socket.on("auth:handoff-request", payload => netshiftShowHandoffModal(payload));
+  socket.on("auth:handoff-expired", payload => netshiftHandoffExpired(payload));
+  socket.on("auth:handoff-declined", payload => {
+    if (NETSHIFT_ACTIVE_HANDOFF && (!payload?.handoffId || payload.handoffId === NETSHIFT_ACTIVE_HANDOFF.id)) {
+      netshiftHideHandoffModal(); toast('Sign-in denied. This session remains active.');
+    }
+  });
+  socket.on("auth:session-revoked", payload => netshiftForceSessionEnd(payload?.message || 'This NETSHIFT ID was transferred to another session.'));
 }
 function netshiftWorldDisconnect() {
   if (NETSHIFT_WORLD_SOCKET) { NETSHIFT_WORLD_SOCKET.removeAllListeners(); NETSHIFT_WORLD_SOCKET.disconnect(); NETSHIFT_WORLD_SOCKET = null; }
-  NETSHIFT_WORLD_DATA = {players:[], targets:[], events:[]};
-  netshiftWorldRenderPlayers([]); netshiftWorldRenderEvents([]);
+  NETSHIFT_WORLD_DATA = {players:[], targets:[], events:[], chat:[]};
+  netshiftWorldRenderPlayers([]); netshiftWorldRenderEvents([]); netshiftWorldRenderChat([]);
   netshiftWorldSetConnection("Signed out", false);
 }
 function netshiftWorldToggle(force) {
@@ -5177,6 +5492,35 @@ async function netshiftWorldProbe() {
     if (button) { button.disabled = false; button.textContent = "Probe host"; }
   }
 }
+async function netshiftWorldBreach() {
+  if (!window.NETSHIFT_USER || NETSHIFT_WORLD_BREACH_BUSY) return;
+  const select = $('worldTargetSelect'), button = $('worldBreachButton');
+  const slug = select?.value;
+  if (!slug) { toast('Choose a shared target first.'); return; }
+  const target = NETSHIFT_WORLD_DATA.targets.find(item => item.slug === slug);
+  if (!target || Number(target.myProbeCount || 0) < 1) { toast('Probe this host at least once first.'); return; }
+  if (target.compromisedByUsername === window.NETSHIFT_USER.username) { toast('You already control this host.'); return; }
+  NETSHIFT_WORLD_BREACH_BUSY = true;
+  if (button) { button.disabled = true; button.textContent = 'Intruding…'; }
+  try {
+    const result = await netshiftApi(`/api/world/targets/${encodeURIComponent(slug)}/breach`, {method:'POST', body:'{}'});
+    const idx = NETSHIFT_WORLD_DATA.targets.findIndex(item => item.slug === result.target.slug);
+    if (idx >= 0) NETSHIFT_WORLD_DATA.targets[idx] = { ...NETSHIFT_WORLD_DATA.targets[idx], ...result.target };
+    else NETSHIFT_WORLD_DATA.targets.push(result.target);
+    if (result.event) NETSHIFT_WORLD_DATA.events = [result.event, ...NETSHIFT_WORLD_DATA.events.filter(item => item.id !== result.event.id)].slice(0, 30);
+    netshiftWorldRenderTargets(); netshiftWorldRenderEvents(NETSHIFT_WORLD_DATA.events);
+    toast(result.result || (result.success ? 'Intrusion succeeded.' : 'Intrusion failed.'));
+  } catch (error) {
+    toast('Intrusion failed: ' + error.message);
+    if (error.status === 401) netshiftWorldSetConnection('Sign in required', false);
+    if (error.retryAfterSeconds && target) target.myLastAttackAt = new Date().toISOString();
+  } finally {
+    NETSHIFT_WORLD_BREACH_BUSY = false;
+    if (button) button.textContent = 'Attempt intrusion';
+    netshiftWorldRenderTargetDetails();
+  }
+}
+
 if ($("worldTargetSelect")) $("worldTargetSelect").addEventListener("change", netshiftWorldRenderTargetDetails);
 
 </script></body></html>
