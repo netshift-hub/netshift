@@ -1,13 +1,14 @@
 {
   "name": "netshift-online",
-  "version": "1.3.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "NETSHIFT browser hacking simulation with exclusive account sessions, persistent saves, realtime shared network, operator chat, and authoritative shared-host intrusion",
+  "description": "NETSHIFT shared multiplayer core with server-authoritative player profiles, bank isolation, files, SafetyShield and admin audit foundations",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "check": "node --check server.js && node scripts/check-client.js && node scripts/check-multiplayer-markers.js && node scripts/check-session-chat.js && node scripts/check-world-compromise.js"
+    "check": "node --check server.js && node scripts/check-client.js && node scripts/check-multiplayer-markers.js && node scripts/check-session-chat.js && node scripts/check-world-compromise.js && node scripts/check-core-v2.js",
+    "admin:grant": "node scripts/grant-admin.js"
   },
   "engines": {
     "node": ">=20"
