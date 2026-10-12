@@ -124,6 +124,33 @@
 .account-link:focus-visible,.account-form input:focus-visible{outline:2px solid #000080;outline-offset:2px}
 @media(max-width:760px){.account-toolbar{left:4px;right:4px;transform:none;justify-content:space-between;gap:3px}.account-toolbar .account-username{max-width:25vw}.account-toolbar .account-save-status{display:none}.account-toolbar .bevel{padding:3px 5px}.account-inner{padding:8px}}
 
+
+/* NETSHIFT Online v1.1 — shared-network panel */
+.world-panel-v11{position:fixed;right:12px;bottom:86px;z-index:50000;width:min(570px,calc(100vw - 24px));max-height:min(76vh,760px);overflow:auto;background:#c0c0c0;border:2px solid;border-color:#fff #404040 #404040 #fff;box-shadow:4px 4px 0 #0006;color:#111;font:12px Tahoma,Verdana,Arial,sans-serif}
+.world-panel-v11[hidden]{display:none!important}
+.world-titlebar-v11{position:sticky;top:0;z-index:1;background:linear-gradient(90deg,#000080,#1084d0);color:#fff;padding:6px 8px;display:flex;align-items:center;justify-content:space-between;font-weight:bold}
+.world-titlebar-v11 button{min-width:22px;height:20px;padding:0;font-weight:bold}
+.world-inner-v11{padding:10px}
+.world-status-v11{display:flex;justify-content:space-between;gap:8px;align-items:center;background:#e7e7e7;border:1px solid #888;padding:6px 8px;margin-bottom:8px}
+.world-status-v11 .online{color:#075e12;font-weight:bold}.world-status-v11 .offline{color:#990000;font-weight:bold}
+.world-columns-v11{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:8px}
+.world-box-v11{border:1px solid #777;background:#eee;padding:8px;min-width:0}
+.world-box-v11 h3,.world-inner-v11>h3{font-size:12px;margin:0 0 7px;color:#102b59}
+.world-list-v11{max-height:180px;overflow:auto;margin:0;padding:0;list-style:none}
+.world-list-v11 li{padding:5px;border-bottom:1px solid #d0d0d0;overflow-wrap:anywhere}
+.world-list-v11 li:last-child{border-bottom:0}
+.world-micro-v11{font-size:10px;color:#555;line-height:1.4}
+.world-target-select-v11{display:block;width:100%;padding:5px;margin:0 0 6px;border:1px solid #777;background:#fff;font:12px Tahoma,Verdana,Arial,sans-serif}
+.world-target-detail-v11{background:#fff;border:1px inset #aaa;padding:7px;min-height:60px;margin:6px 0;overflow-wrap:anywhere}
+.world-activity-v11{max-height:170px;overflow:auto;background:#fff;border:1px inset #aaa;margin-top:6px}
+.world-activity-v11 .event{padding:6px 7px;border-bottom:1px solid #ddd;overflow-wrap:anywhere;line-height:1.35}
+.world-activity-v11 .event:last-child{border-bottom:0}
+.world-activity-v11 .event-time{display:block;color:#666;font-size:10px;margin-bottom:2px}
+.world-actions-v11{display:flex;gap:6px;flex-wrap:wrap}
+.world-actions-v11 button{font:11px Tahoma,Verdana,Arial,sans-serif}
+.world-footnote-v11{margin:8px 0 0;color:#555;font-size:10px;line-height:1.45}
+@media(max-width:540px){.world-panel-v11{right:6px;bottom:82px;width:calc(100vw - 12px);max-height:80vh}.world-columns-v11{grid-template-columns:1fr}.world-list-v11{max-height:115px}}
+
 </style></head><body>
 <div class="wallpaper"></div><div class="desktop">
 <div class="desktop-icons" id="desktopIcons"><div class="deskicon" onclick="go('whois.com')"><span>🌐</span>Internet</div><div class="deskicon" ondblclick="openExplorerWindow()" onclick="openExplorerWindow()"><span>📁</span>My Files</div><div class="deskicon" ondblclick="openProcessesWindow()" onclick="openProcessesWindow()"><span>⏱️</span>Processes</div><div class="deskicon" ondblclick="openBankInfoWindow()" onclick="openBankInfoWindow()"><span>📝</span>bank-info.txt</div><div class="deskicon" ondblclick="openRouterWindow()" onclick="openRouterWindow()"><span>📡</span>router.exe</div><div id="softwareIcons" style="display:contents"></div></div>
@@ -135,7 +162,22 @@
   <span>NETSHIFT ID:</span><span id="accountUsername" class="account-username">—</span>
   <span id="cloudSaveStatus" class="account-save-status">Not saved</span>
   <button class="bevel" type="button" onclick="cloudSaveNow()">Save game</button>
+  <button class="bevel" type="button" id="cloudSaveReloadButton" onclick="netshiftResolveSaveConflict()" hidden>Load latest</button>
+  <button class="bevel" type="button" onclick="netshiftWorldToggle()">World</button>
   <button class="bevel" type="button" onclick="netshiftLogout()">Log out</button>
+</div>
+<div id="worldPanel" class="world-panel-v11" hidden aria-label="Shared network">
+  <div class="world-titlebar-v11"><span>NETSHIFT GLOBAL NETWORK // ALPHA</span><button class="bevel" type="button" onclick="netshiftWorldToggle(false)" aria-label="Close shared network">×</button></div>
+  <div class="world-inner-v11">
+    <div class="world-status-v11"><span>Realtime link: <strong id="worldConnectionStatus" class="offline">Connecting…</strong></span><span>Operators online: <strong id="worldOnlineCount">0</strong></span></div>
+    <div class="world-columns-v11">
+      <section class="world-box-v11"><h3>OPERATORS ONLINE</h3><ul id="worldPlayersList" class="world-list-v11"><li>Loading operator list…</li></ul><p class="world-micro-v11">Only public usernames are shown.</p></section>
+      <section class="world-box-v11"><h3>SHARED PUBLIC HOSTS</h3><select id="worldTargetSelect" class="world-target-select-v11" aria-label="Shared target"></select><div id="worldTargetDetails" class="world-target-detail-v11">Loading shared target registry…</div><div class="world-actions-v11"><button class="bevel" id="worldProbeButton" type="button" onclick="netshiftWorldProbe()">Probe host</button><button class="bevel" type="button" onclick="netshiftWorldRefresh()">Refresh</button></div></section>
+    </div>
+    <h3 style="margin-top:10px">SHARED ACTIVITY LOG</h3>
+    <div id="worldActivityList" class="world-activity-v11"><div class="event">Waiting for shared events…</div></div>
+    <p class="world-footnote-v11">Multiplayer foundation preview: public host metadata and server-recorded probe events are shared live and persist in the database. Hacking outcomes, in-game bank balances, player files and malware effects are still isolated in each player's sandbox at this stage.</p>
+  </div>
 </div>
 <div id="authOverlay" class="account-overlay" role="dialog" aria-modal="true" aria-labelledby="authTitle">
   <div class="account-window">
@@ -169,6 +211,7 @@
   </div>
 </div>
 
+<script src="/socket.io/socket.io.js"></script>
 <script>
 
 const PLAYER_IP = "10.0.0.7";
@@ -4711,6 +4754,11 @@ let NETSHIFT_LAST_SAVED_FINGERPRINT = "";
 let NETSHIFT_SAVE_BUSY = false;
 let NETSHIFT_SAVE_TIMER = null;
 let NETSHIFT_LOGOUT_BUSY = false;
+let NETSHIFT_SAVE_REVISION = 0;
+let NETSHIFT_SAVE_CONFLICTED = false;
+let NETSHIFT_WORLD_SOCKET = null;
+let NETSHIFT_WORLD_DATA = {players:[], targets:[], events:[]};
+let NETSHIFT_WORLD_PROBE_BUSY = false;
 
 function netshiftSetAuthMessage(message, kind="") {
   const el = $("authMessage");
@@ -4753,6 +4801,7 @@ function netshiftSetAuthenticated(user) {
   $("authOverlay").hidden = true;
   netshiftSetSaveStatus("Connected · cloud saves on");
   document.title = `NETSHIFT Online — ${user.username}`;
+  netshiftWorldConnect();
 }
 function netshiftDeepMerge(target, source) {
   if (!source || typeof source !== "object" || Array.isArray(source)) return target;
@@ -4802,11 +4851,16 @@ function netshiftSnapshot() {
     state: safeState
   };
 }
-function netshiftFingerprint(snapshot) { const comparable = { ...snapshot, savedAt: null }; return JSON.stringify(comparable); }
+function netshiftFingerprint(snapshot) { const comparable = { ...snapshot, savedAt: null }; delete comparable.baseRevision; return JSON.stringify(comparable); }
 async function netshiftSave({force=false, quiet=false, keepalive=false}={}) {
   if (!window.NETSHIFT_USER || NETSHIFT_SAVE_BUSY) return false;
+  if (NETSHIFT_SAVE_CONFLICTED) {
+    netshiftSetSaveStatus("Save conflict · load latest");
+    if (!quiet) toast("This account's save changed in another session. Use Load latest before saving again.");
+    return false;
+  }
   let snapshot;
-  try { snapshot = netshiftSnapshot(); }
+  try { snapshot = netshiftSnapshot(); snapshot.baseRevision = NETSHIFT_SAVE_REVISION; }
   catch (error) {
     netshiftSetSaveStatus("Save error · state snapshot failed");
     if (!quiet) toast("Could not prepare save data. Please report this issue.");
@@ -4818,19 +4872,27 @@ async function netshiftSave({force=false, quiet=false, keepalive=false}={}) {
   NETSHIFT_SAVE_BUSY = true;
   netshiftSetSaveStatus("Saving…");
   try {
-    await netshiftApi("/api/save", {
+    const saveResult = await netshiftApi("/api/save", {
       method: "POST",
       body: JSON.stringify(snapshot),
       ...(keepalive ? { keepalive: true } : {})
     });
+    NETSHIFT_SAVE_REVISION = Number(saveResult.revision || 0);
     NETSHIFT_LAST_SAVED_FINGERPRINT = fingerprint;
     const time = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
     netshiftSetSaveStatus("Saved " + time);
     if (!quiet) toast("Game progress saved to your NETSHIFT account.");
     return true;
   } catch (error) {
-    netshiftSetSaveStatus(error.status === 401 ? "Session expired · sign in again" : "Save failed · retrying");
-    if (!quiet) toast("Cloud save failed: " + error.message);
+    if (error.status === 409) {
+      NETSHIFT_SAVE_CONFLICTED = true;
+      const reloadButton = $("cloudSaveReloadButton"); if (reloadButton) reloadButton.hidden = false;
+      netshiftSetSaveStatus("Save conflict · load latest");
+      if (!quiet) toast("Another session saved newer progress. Load the latest save before saving again.");
+    } else {
+      netshiftSetSaveStatus(error.status === 401 ? "Session expired · sign in again" : "Save failed · retrying");
+      if (!quiet) toast("Cloud save failed: " + error.message);
+    }
     console.error("NETSHIFT cloud save failed", error);
     return false;
   } finally { NETSHIFT_SAVE_BUSY = false; }
@@ -4868,6 +4930,9 @@ async function netshiftAfterAuth(user) {
     toast("Could not load cloud save. Existing server data has not been changed.");
   }
   let restored = false;
+  NETSHIFT_SAVE_REVISION = readFailed ? 0 : Number(result.revision || 0);
+  NETSHIFT_SAVE_CONFLICTED = false;
+  const reloadButton = $("cloudSaveReloadButton"); if (reloadButton) reloadButton.hidden = true;
   if (!readFailed && result.save) restored = netshiftRestoreSave(result.save);
   else if (!readFailed) {
     netshiftResetGameState();
@@ -4881,7 +4946,7 @@ async function netshiftAfterAuth(user) {
   if (restored) toast("Saved game loaded for " + user.username + ".");
   if (NETSHIFT_SAVE_TIMER) clearInterval(NETSHIFT_SAVE_TIMER);
   NETSHIFT_SAVE_TIMER = setInterval(() => {
-    if (NETSHIFT_LAST_SAVED_FINGERPRINT !== "__save_read_failed__") netshiftSave({quiet:true});
+    if (NETSHIFT_LAST_SAVED_FINGERPRINT !== "__save_read_failed__" && !NETSHIFT_SAVE_CONFLICTED) netshiftSave({quiet:true});
   }, 4000);
 }
 async function netshiftHandleAuthSubmit(event, mode) {
@@ -4916,8 +4981,12 @@ async function netshiftLogout() {
   } catch (error) { console.warn("NETSHIFT logout note", error); }
   finally {
     NETSHIFT_LOGOUT_BUSY = false;
+    netshiftWorldDisconnect();
     if (NETSHIFT_SAVE_TIMER) clearInterval(NETSHIFT_SAVE_TIMER);
     NETSHIFT_SAVE_TIMER = null; window.NETSHIFT_USER = null; NETSHIFT_LAST_SAVED_FINGERPRINT = "";
+    NETSHIFT_SAVE_REVISION = 0; NETSHIFT_SAVE_CONFLICTED = false;
+    const reloadButton = $("cloudSaveReloadButton"); if (reloadButton) reloadButton.hidden = true;
+    $("worldPanel").hidden = true;
     $("accountToolbar").hidden = true; $("authOverlay").hidden = false;
     netshiftSetAuthMessage("You have been signed out. Your last saved progress remains linked to your account.", "success");
     showAccountForm("login");
@@ -4929,10 +4998,17 @@ $("loginForm").addEventListener("submit", event => netshiftHandleAuthSubmit(even
 $("registerForm").addEventListener("submit", event => netshiftHandleAuthSubmit(event, "register"));
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") netshiftSave({quiet:true}); });
 window.addEventListener("pagehide", () => {
-  if (!window.NETSHIFT_USER) return;
+  // Avoid racing the normal autosave with a second request using the same revision.
+  if (!window.NETSHIFT_USER || NETSHIFT_SAVE_BUSY || NETSHIFT_SAVE_CONFLICTED) return;
   try {
     const snapshot = netshiftSnapshot();
-    fetch("/api/save", {method:"POST", credentials:"same-origin", keepalive:true, headers:{"Content-Type":"application/json"}, body:JSON.stringify(snapshot)}).catch(()=>{});
+    snapshot.baseRevision = NETSHIFT_SAVE_REVISION;
+    fetch("/api/save", {method:"POST", credentials:"same-origin", keepalive:true, headers:{"Content-Type":"application/json"}, body:JSON.stringify(snapshot)})
+      .then(async response => {
+        if (!response.ok) return;
+        const result = await response.json();
+        NETSHIFT_SAVE_REVISION = Number(result.revision || NETSHIFT_SAVE_REVISION);
+      }).catch(()=>{});
   } catch (_) { /* periodic saves remain the primary safeguard */ }
 });
 (async function netshiftInitialiseAuth() {
@@ -4946,5 +5022,161 @@ window.addEventListener("pagehide", () => {
     netshiftSetAuthMessage("Unable to reach the NETSHIFT backend. Check your connection or ask the site administrator to check the server and database configuration. " + error.message, "error");
   }
 })();
+
+
+
+/* NETSHIFT Online v1.1 — multiplayer-compatible shared-world client. */
+async function netshiftResolveSaveConflict() {
+  if (!window.NETSHIFT_USER || !NETSHIFT_SAVE_CONFLICTED) return;
+  const btn = $("cloudSaveReloadButton"); if (btn) { btn.disabled = true; btn.textContent = "Loading…"; }
+  try {
+    const result = await netshiftApi("/api/save", {method:"GET"});
+    NETSHIFT_SAVE_REVISION = Number(result.revision || 0);
+    if (result.save) netshiftRestoreSave(result.save);
+    else { netshiftResetGameState(); go("whois.com", false); }
+    NETSHIFT_SAVE_CONFLICTED = false;
+    NETSHIFT_LAST_SAVED_FINGERPRINT = netshiftFingerprint(netshiftSnapshot());
+    if (btn) btn.hidden = true;
+    netshiftSetSaveStatus("Latest save loaded");
+    toast("Latest cloud save loaded. Your unsaved local changes from the stale session were replaced.");
+  } catch (error) {
+    netshiftSetSaveStatus("Could not load latest save");
+    toast("Could not resolve save conflict: " + error.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "Load latest"; }
+  }
+}
+
+function netshiftWorldSetConnection(text, online=false) {
+  const el = $("worldConnectionStatus");
+  if (el) { el.textContent = text; el.className = online ? "online" : "offline"; }
+}
+function netshiftWorldRenderPlayers(players=[]) {
+  const list = $("worldPlayersList");
+  if (!list) return;
+  const clean = Array.isArray(players) ? players : [];
+  $("worldOnlineCount").textContent = String(clean.length);
+  if (!clean.length) { list.innerHTML = "<li>No operators online.</li>"; return; }
+  list.innerHTML = clean.map(player => `<li><strong>${esc(player.username)}</strong>${String(player.id) === String(window.NETSHIFT_USER?.id) ? ' <span class="world-micro-v11">(YOU)</span>' : ''}<br><span class="world-micro-v11">ONLINE · NETSHIFT ID</span></li>`).join("");
+}
+function netshiftWorldRenderTargetDetails() {
+  const select = $("worldTargetSelect"), detail = $("worldTargetDetails");
+  if (!select || !detail) return;
+  const target = NETSHIFT_WORLD_DATA.targets.find(item => item.slug === select.value) || NETSHIFT_WORLD_DATA.targets[0];
+  if (!target) { detail.textContent = "No shared hosts available."; return; }
+  if (select.value !== target.slug) select.value = target.slug;
+  detail.innerHTML = `<strong>${esc(target.name)}</strong><br><span class="world-micro-v11">${esc(target.domain)} · Firewall L${Number(target.securityLevel)}</span><p style="margin:5px 0">${esc(target.description)}</p><span class="world-micro-v11">Server-recorded probes: ${Number(target.probeCount || 0)}${target.lastProbedByUsername ? ` · Last probe by ${esc(target.lastProbedByUsername)}` : ''}</span>`;
+}
+function netshiftWorldRenderTargets() {
+  const select = $("worldTargetSelect");
+  if (!select) return;
+  const previous = select.value;
+  select.innerHTML = NETSHIFT_WORLD_DATA.targets.map(target => `<option value="${esc(target.slug)}">${esc(target.name)} (${esc(target.domain)})</option>`).join("");
+  if (NETSHIFT_WORLD_DATA.targets.some(target => target.slug === previous)) select.value = previous;
+  netshiftWorldRenderTargetDetails();
+}
+function netshiftWorldRenderEvents(events=[]) {
+  const list = $("worldActivityList");
+  if (!list) return;
+  const clean = Array.isArray(events) ? events.slice(0, 30) : [];
+  if (!clean.length) { list.innerHTML = '<div class="event">No shared events yet. Probe a host to record the first one.</div>'; return; }
+  list.innerHTML = clean.map(event => {
+    let time = "RECENT";
+    try { time = new Date(event.createdAt).toLocaleString([], {month:"short", day:"numeric", hour:"2-digit", minute:"2-digit"}); } catch (_) {}
+    return `<div class="event"><span class="event-time">${esc(time)} · ${esc(event.actorUsername)} · ${esc(event.type)}</span>${esc(event.summary)}</div>`;
+  }).join("");
+}
+async function netshiftWorldRefresh() {
+  if (!window.NETSHIFT_USER) return;
+  try {
+    const snapshot = await netshiftApi("/api/world/summary", {method:"GET"});
+    NETSHIFT_WORLD_DATA = {
+      players: Array.isArray(snapshot.players) ? snapshot.players : [],
+      targets: Array.isArray(snapshot.targets) ? snapshot.targets : [],
+      events: Array.isArray(snapshot.events) ? snapshot.events : []
+    };
+    netshiftWorldRenderPlayers(NETSHIFT_WORLD_DATA.players);
+    netshiftWorldRenderTargets();
+    netshiftWorldRenderEvents(NETSHIFT_WORLD_DATA.events);
+    if (!NETSHIFT_WORLD_SOCKET?.connected) netshiftWorldSetConnection("Realtime unavailable", false);
+  } catch (error) {
+    netshiftWorldSetConnection("Network error", false);
+    const list = $("worldActivityList"); if (list) list.innerHTML = `<div class="event">Could not load the shared network: ${esc(error.message)}</div>`;
+  }
+}
+function netshiftWorldConnect() {
+  if (!window.NETSHIFT_USER || typeof window.io !== "function") {
+    netshiftWorldSetConnection("Realtime unavailable", false); return;
+  }
+  if (NETSHIFT_WORLD_SOCKET) {
+    if (NETSHIFT_WORLD_SOCKET.connected) { netshiftWorldRefresh(); return; }
+    NETSHIFT_WORLD_SOCKET.disconnect();
+    NETSHIFT_WORLD_SOCKET = null;
+  }
+  netshiftWorldSetConnection("Connecting…", false);
+  const socket = window.io({withCredentials:true, reconnection:true, timeout:8000});
+  NETSHIFT_WORLD_SOCKET = socket;
+  socket.on("connect", () => {
+    netshiftWorldSetConnection("Connected", true);
+    netshiftWorldRefresh();
+  });
+  socket.on("connect_error", error => {
+    netshiftWorldSetConnection(error?.message?.toLowerCase().includes("sign in") ? "Sign in required" : "Disconnected · retrying", false);
+  });
+  socket.on("disconnect", () => netshiftWorldSetConnection("Disconnected · reconnecting", false));
+  socket.on("world:presence", payload => {
+    NETSHIFT_WORLD_DATA.players = Array.isArray(payload?.players) ? payload.players : [];
+    netshiftWorldRenderPlayers(NETSHIFT_WORLD_DATA.players);
+  });
+  socket.on("world:event", event => {
+    if (!event || typeof event.summary !== "string") return;
+    NETSHIFT_WORLD_DATA.events = [event, ...NETSHIFT_WORLD_DATA.events.filter(item => item.id !== event.id)].slice(0, 30);
+    netshiftWorldRenderEvents(NETSHIFT_WORLD_DATA.events);
+  });
+  socket.on("world:target-updated", target => {
+    if (!target || typeof target.slug !== "string") return;
+    const idx = NETSHIFT_WORLD_DATA.targets.findIndex(item => item.slug === target.slug);
+    if (idx >= 0) NETSHIFT_WORLD_DATA.targets[idx] = target;
+    else NETSHIFT_WORLD_DATA.targets.push(target);
+    netshiftWorldRenderTargets();
+  });
+}
+function netshiftWorldDisconnect() {
+  if (NETSHIFT_WORLD_SOCKET) { NETSHIFT_WORLD_SOCKET.removeAllListeners(); NETSHIFT_WORLD_SOCKET.disconnect(); NETSHIFT_WORLD_SOCKET = null; }
+  NETSHIFT_WORLD_DATA = {players:[], targets:[], events:[]};
+  netshiftWorldRenderPlayers([]); netshiftWorldRenderEvents([]);
+  netshiftWorldSetConnection("Signed out", false);
+}
+function netshiftWorldToggle(force) {
+  if (!window.NETSHIFT_USER) { toast("Sign in to access the shared network."); return; }
+  const panel = $("worldPanel"); if (!panel) return;
+  const next = typeof force === "boolean" ? force : panel.hidden;
+  panel.hidden = !next;
+  if (next) netshiftWorldRefresh();
+}
+async function netshiftWorldProbe() {
+  if (!window.NETSHIFT_USER || NETSHIFT_WORLD_PROBE_BUSY) return;
+  const select = $("worldTargetSelect"), button = $("worldProbeButton");
+  const slug = select?.value;
+  if (!slug) { toast("Choose a shared target first."); return; }
+  NETSHIFT_WORLD_PROBE_BUSY = true;
+  if (button) { button.disabled = true; button.textContent = "Probing…"; }
+  try {
+    const result = await netshiftApi(`/api/world/targets/${encodeURIComponent(slug)}/probe`, {method:"POST", body:"{}"});
+    toast(result.result || "Probe recorded.");
+    const target = result.target;
+    const idx = NETSHIFT_WORLD_DATA.targets.findIndex(item => item.slug === target.slug);
+    if (idx >= 0) NETSHIFT_WORLD_DATA.targets[idx] = target; else NETSHIFT_WORLD_DATA.targets.push(target);
+    if (result.event) NETSHIFT_WORLD_DATA.events = [result.event, ...NETSHIFT_WORLD_DATA.events.filter(item => item.id !== result.event.id)].slice(0, 30);
+    netshiftWorldRenderTargets(); netshiftWorldRenderEvents(NETSHIFT_WORLD_DATA.events);
+  } catch (error) {
+    toast("Shared-network action failed: " + error.message);
+    if (error.status === 401) netshiftWorldSetConnection("Sign in required", false);
+  } finally {
+    NETSHIFT_WORLD_PROBE_BUSY = false;
+    if (button) { button.disabled = false; button.textContent = "Probe host"; }
+  }
+}
+if ($("worldTargetSelect")) $("worldTargetSelect").addEventListener("change", netshiftWorldRenderTargetDetails);
 
 </script></body></html>

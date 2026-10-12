@@ -1,10 +1,16 @@
-# NETSHIFT Online — hosted web-game starter
+# NETSHIFT Online — shared-world multiplayer foundation (v1.1)
 
 This project packages the existing NETSHIFT v21 game with a Node.js/Express backend, PostgreSQL-backed user accounts and sessions, and per-account cloud saves.
 
 ## Included in this milestone
 
 - The existing v21 interface and game mechanics, retained in `public/index.html`.
+- An authenticated Socket.IO channel sharing online operator presence in real time.
+- A shared public-host registry seeded from the current game target catalogue.
+- A **World** panel in the account toolbar showing online operators, public targets and recent shared activity.
+- A server-validated `Probe host` action that increments a target counter, writes a persistent event in PostgreSQL and broadcasts the event to other connected players.
+- Shared target/probe/event state persists across web-service restarts; presence is recalculated on reconnect.
+- Optimistic save revisions: two concurrent sessions can no longer silently overwrite each other's cloud save. A stale session is shown a **Load latest** recovery control.
 - Username/password registration and sign-in. User passwords are hashed with bcrypt; raw passwords are not stored.
 - Server-side sessions stored in PostgreSQL, with HttpOnly/SameSite cookies.
 - Per-user JSON save slot stored in PostgreSQL and loaded after sign-in.
@@ -14,9 +20,9 @@ This project packages the existing NETSHIFT v21 game with a Node.js/Express back
 
 ## What this is not yet
 
-This is a persistent account-based web version, not multiplayer. Each account has a private copy of the game's world. Most gameplay logic still executes in the browser and the server stores the browser-submitted save; a technically capable player can alter that save. Do not use this version for a competitive shared economy or real-money value. A later multiplayer milestone should move cash transfers, purchases, hacks, timers and security sweep outcomes into server-validated game commands.
+This is an **initial multiplayer-compatible foundation**, not a complete multiplayer game. The shared slice currently covers authenticated presence, public target metadata and server-recorded probe events. The rest of the game remains each player's private sandbox. Most existing gameplay logic still executes in the browser and the server stores the browser-submitted save; a technically capable player can alter that save. Bank balances, purchases, hacks, file state, malware and security-sweep outcomes are **not** yet shared or server-authoritative. Do not use this version for a competitive shared economy or real-money value. The next gameplay migrations must move cash transfers, purchases, hacks, timers and security-sweep outcomes into validated transactional server commands.
 
-The original prototype uses inline JavaScript handlers and styles, so the server currently disables Content Security Policy while retaining Helmet's other defaults. A stronger CSP is appropriate after the client is modularised. This first build has no email verification, password reset, account deletion or admin dashboard; keep a unique password and do not reuse a sensitive password.
+The original prototype uses inline JavaScript handlers and styles, so the server currently disables Content Security Policy while retaining Helmet's other defaults. A stronger CSP is appropriate after the client is modularised. The first shared-world deployment is intended to run as one Render web-service instance. The default Socket.IO adapter keeps live presence/broadcasts within that instance; before running multiple service instances, configure a shared Socket.IO adapter and suitable session affinity/sticky sessions. This first build has no email verification, password reset, account deletion or admin dashboard; keep a unique password and do not reuse a sensitive password.
 
 ## Deploy online (recommended path)
 
@@ -94,5 +100,31 @@ npm start
 1. Test and fix account/save behaviour with real browser sessions.
 2. Add save migration/version handling and a backup/restore procedure.
 3. Modularise the client and establish regression tests for existing mechanics.
-4. Move important game commands and economy logic to validated server endpoints.
-5. Add an actual shared world (player profiles, public network state, PvP permissions, conflict resolution, anti-cheat and moderation).
+4. **Current v1.1 slice:** authenticated online presence, persistent shared targets and server-recorded live probe feed; save concurrency control.
+5. Move important game commands and economy logic to validated server endpoints (transactions, purchases, hacks, timers, Warez/security sweeps).
+6. Design target compromise/ownership, PvP permissions, retaliation, offline protection, moderation, reporting and anti-cheat before enabling consequential player-vs-player effects.
+7. Add a shared-world migration and two-account regression suite before considering multiplayer beta.
+
+
+## Multiplayer foundation deployment notes
+
+No new production secret is required for v1.1. The existing `DATABASE_URL` and `SESSION_SECRET` remain in use. The application creates the additional world tables and adds the save revision column automatically during startup. Existing user accounts and saves are preserved; existing saves start at revision 1. After deployment, users with an already-open game page should refresh so the new revision-aware client is loaded.
+
+### Multiplayer smoke test
+
+1. Deploy v1.1 and confirm `/api/health` reports `database: connected` and `realtime: enabled`.
+2. Sign in with two different accounts in separate browser profiles.
+3. Click **World** in both toolbars. Both should list both operators and show a connected realtime link.
+4. In profile A, choose a shared host and click **Probe host**. Profile B should receive the activity event without refreshing; the probe counter and last-prober name should update.
+5. Refresh the page in profile B. The probe count and activity event should remain because they are stored in PostgreSQL.
+6. Log profile B out. Profile A should see its presence disappear shortly after the WebSocket disconnect.
+7. Optional stale-save test: sign into the same account in two isolated browser profiles, save a change in profile A, then attempt to save from stale profile B. B should receive a save conflict rather than silently overwrite A. Use **Load latest** to return B to the current saved version. Do not use concurrent sessions for ordinary play until this is fully familiar.
+8. Confirm the same in-game bank/economy is not shared yet; that is an explicit limitation, not a failed v1.1 test.
+
+### New server API
+
+- `GET /api/world/summary` (authenticated): online users, seeded hosts and the latest 30 shared events.
+- `POST /api/world/targets/:slug/probe` (authenticated, rate-limited): writes a shared probe count and event using server-side data, then broadcasts it through Socket.IO.
+- Socket.IO events: `world:presence`, `world:event`, and `world:target-updated`. Socket connections require the same authenticated Express session as the REST API.
+
+The shared-world event stream exposes usernames and actions only; it does not expose session IDs, emails, real IP addresses or private game saves.
