@@ -15,3 +15,8 @@
 - Complete NPC attack scheduler, exact loot snapshot regeneration and router logs.
 - Administrator MFA enrollment/enforcement and production security sign-off.
 - End-to-end PostgreSQL/staging testing.
+
+## Staging hardening follow-up
+- Allow a player's first SafetyShield change immediately; start the one-hour lock only after that change and persist the state across redeploys.
+- Tighten `.gitignore` to cover `.env.*` without ignoring `.env.example`.
+- Add a staging deployment guide and API-focused v2 preview acceptance checklist.

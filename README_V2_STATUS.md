@@ -39,6 +39,12 @@ This package is an incremental development build based on v1.3. It is **not yet 
 - Add transactional player bank transfers/ledger, player-to-player PvP theft limits, and full authoritative save migration so browser-submitted legacy saves cannot overwrite protected account/economy fields.
 - End-to-end test against a disposable PostgreSQL database, then two separate browser profiles against a deployed staging instance. This preview has only static/syntax checks; it has not been tested against live PostgreSQL, Render or Neon.
 
+## Staging preview update (2026-10-13)
+
+- Corrected SafetyShield cooldown initialization: the default ON setting may be changed once immediately; the one-hour cooldown begins after the first actual change. The change state is persisted in `shield_has_been_changed` so it survives restarts.
+- Updated `.gitignore` to exclude `.env.*` while explicitly preserving `.env.example`.
+- Added `NETSHIFT_CORE_V2_STAGING_DEPLOYMENT.md` and `NETSHIFT_CORE_V2_STAGING_TEST_CHECKLIST.md` for controlled staging rollout and API validation.
+
 ## Verification
 
 Run `npm run check`. It checks server syntax, embedded client JavaScript syntax, existing multiplayer tests and static Core v2 feature markers. It does not replace integration tests against PostgreSQL.

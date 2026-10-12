@@ -17,6 +17,8 @@ const requiredServer = [
   "app.post('/api/admin/:action/:username'",
   "app.get('/api/admin/logs'",
   'credential_lock_until',
+  'shield_has_been_changed',
+  'if (current.shield_has_been_changed)',
   'netshift_admin_roles'
 ];
 const requiredClient = [

@@ -154,6 +154,7 @@ async function initialiseDatabase() {
       workstation_ip INET NOT NULL UNIQUE,
       safety_shield BOOLEAN NOT NULL DEFAULT TRUE,
       shield_changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      shield_has_been_changed BOOLEAN NOT NULL DEFAULT FALSE,
       pvp_immune_until TIMESTAMPTZ,
       bank_setup_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -226,6 +227,11 @@ async function initialiseDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
+  // First-time SafetyShield change is allowed immediately; the one-hour cooldown
+  // begins only after the player actually changes the default ON setting.
+  await pool.query(`ALTER TABLE netshift_player_world
+    ADD COLUMN IF NOT EXISTS shield_has_been_changed BOOLEAN NOT NULL DEFAULT FALSE`);
+
   // Seed the shared public-host directory idempotently. Target counters and probe history
   // are preserved on restarts and redeploys.
   for (const target of WORLD_TARGET_SEEDS) {
@@ -942,13 +948,15 @@ app.post('/api/core/safetyshield', requireAuth, async (req, res, next) => {
     const c = await pool.connect();
     try {
       await c.query('BEGIN');
-      const row = await c.query('SELECT safety_shield, shield_changed_at FROM netshift_player_world WHERE user_id=$1 FOR UPDATE', [req.session.user.id]);
+      const row = await c.query('SELECT safety_shield, shield_changed_at, shield_has_been_changed FROM netshift_player_world WHERE user_id=$1 FOR UPDATE', [req.session.user.id]);
       if (!row.rowCount) { await c.query('ROLLBACK'); return res.status(404).json({ error: 'Player profile missing.' }); }
       const current = row.rows[0];
       if (current.safety_shield === enabled) { await c.query('COMMIT'); return res.json({ ok: true, safetyShield: enabled, unchanged: true }); }
-      const remaining = 3600000 - (Date.now() - new Date(current.shield_changed_at).getTime());
-      if (remaining > 0) { await c.query('ROLLBACK'); return res.status(429).json({ error: 'SafetyShield can only be changed once per hour.', code: 'SHIELD_COOLDOWN', remainingMs: remaining }); }
-      await c.query('UPDATE netshift_player_world SET safety_shield=$2, shield_changed_at=NOW() WHERE user_id=$1', [req.session.user.id, enabled]);
+      if (current.shield_has_been_changed) {
+        const remaining = 3600000 - (Date.now() - new Date(current.shield_changed_at).getTime());
+        if (remaining > 0) { await c.query('ROLLBACK'); return res.status(429).json({ error: 'SafetyShield can only be changed once per hour.', code: 'SHIELD_COOLDOWN', remainingMs: remaining }); }
+      }
+      await c.query('UPDATE netshift_player_world SET safety_shield=$2, shield_changed_at=NOW(), shield_has_been_changed=TRUE WHERE user_id=$1', [req.session.user.id, enabled]);
       await c.query('COMMIT');
       if (io) io.to(WORLD_ROOM).emit('world:shield-change', { username: req.session.user.username, enabled });
       res.json({ ok: true, safetyShield: enabled, changedAt: new Date().toISOString() });
