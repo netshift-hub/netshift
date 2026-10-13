@@ -16,6 +16,7 @@ const { generateGameIp, generateBankAccountNumber, legacyDeterministicAccountNum
 const { applyLegacySaveCutover, isRetiredLegacySave } = require('./lib/legacy-save-cutover');
 const { validateSaveRequest, normaliseStoredSave } = require('./lib/save-protocol');
 const { HostDownloadClaimError, assertHostSlug, assertHostItemId, normaliseHostStock, publicHostStockItem, claimHostDownload } = require('./lib/host-download-claim');
+const { createGeneratedHostLoot, regenerateHostStock } = require('./lib/host-loot-regeneration');
 
 const isProduction = process.env.NODE_ENV === 'production';
 const PORT = Number(process.env.PORT || 3000);
@@ -99,6 +100,7 @@ async function initialiseDatabase() {
       name VARCHAR(100) NOT NULL,
       domain VARCHAR(120) NOT NULL UNIQUE,
       security_level SMALLINT NOT NULL DEFAULT 0 CHECK (security_level BETWEEN 0 AND 5),
+      target_type VARCHAR(24) NOT NULL DEFAULT 'website' CHECK (target_type IN ('website','npc_workstation')),
       description VARCHAR(240) NOT NULL DEFAULT '',
       probe_count BIGINT NOT NULL DEFAULT 0,
       last_probed_by_user_id BIGINT REFERENCES netshift_users(id) ON DELETE SET NULL,
@@ -109,6 +111,7 @@ async function initialiseDatabase() {
     );
 
     ALTER TABLE netshift_world_targets
+      ADD COLUMN IF NOT EXISTS target_type VARCHAR(24) NOT NULL DEFAULT 'website' CHECK (target_type IN ('website','npc_workstation')),
       ADD COLUMN IF NOT EXISTS compromised_by_user_id BIGINT REFERENCES netshift_users(id) ON DELETE SET NULL,
       ADD COLUMN IF NOT EXISTS compromised_by_username VARCHAR(20),
       ADD COLUMN IF NOT EXISTS compromised_at TIMESTAMPTZ;
@@ -272,18 +275,19 @@ async function initialiseDatabase() {
   // are preserved on restarts and redeploys.
   for (const target of WORLD_TARGET_SEEDS) {
     await pool.query(`
-      INSERT INTO netshift_world_targets (slug, name, domain, security_level, description)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO netshift_world_targets (slug, name, domain, security_level, target_type, description)
+      VALUES ($1, $2, $3, $4, $5, $6)
       ON CONFLICT (slug) DO UPDATE SET
         name = EXCLUDED.name,
         domain = EXCLUDED.domain,
         security_level = EXCLUDED.security_level,
+        target_type = EXCLUDED.target_type,
         description = EXCLUDED.description,
         updated_at = NOW()
-    `, [target.slug, target.name, target.domain, target.securityLevel, target.description]);
+    `, [target.slug, target.name, target.domain, target.securityLevel, target.targetType, target.description]);
     const stock = [
       { id: `${target.slug}-readme`, name: 'README.txt', type: 'file', content: `Public files for ${target.name}.` },
-      { id: `${target.slug}-warez1`, name: 'Warez Virus L1.vshare', type: 'software', family: 'warez', level: 1 }
+      createGeneratedHostLoot(target, { now: new Date() })
     ];
     await pool.query(`INSERT INTO netshift_world_host_inventory(target_slug,stock,money_cents)
       VALUES($1,$2::jsonb,$3) ON CONFLICT(target_slug) DO NOTHING`, [target.slug, JSON.stringify(stock), target.securityLevel <= 1 ? 25000 : 10000]);
@@ -298,23 +302,23 @@ async function initialiseDatabase() {
 }
 
 const WORLD_TARGET_SEEDS = [
-  { slug: 'finance', name: 'Small Finance Co.', domain: 'smallfinance.local', securityLevel: 0, description: 'Small financial-services host; a low-security tutorial target.' },
-  { slug: 'hacker', name: 'Forgetful Hacker', domain: 'forgottenpc.local', securityLevel: 1, description: 'A personal workstation with basic password protection.' },
-  { slug: 'bank', name: 'First Bank Online', domain: 'firstbank.local', securityLevel: 1, description: 'Fictional bank host; customer balances remain in each player sandbox for now.' },
-  { slug: 'pawperfect', name: 'PawPerfect Pet Nutrition', domain: 'pawperfect.pet', securityLevel: 1, description: 'Premium nutrition for happy pets.' },
-  { slug: 'chrono', name: 'Chrono Watch Enthusiasts', domain: 'chronowatch.club', securityLevel: 1, description: 'A community for horology enthusiasts.' },
-  { slug: 'terry', name: 'Terry Schwarz — Personal Home Page', domain: 'terryschwarz.me', securityLevel: 1, description: 'A personal site belonging to Terry Schwarz.' },
-  { slug: 'acorn', name: 'Acorn Student Union', domain: 'acornstudents.org', securityLevel: 0, description: 'Campus groups, events and noticeboards.' },
-  { slug: 'pixelarcade', name: 'Pixel Arcade', domain: 'pixelarcade.games', securityLevel: 1, description: 'Retro games and online high scores.' },
-  { slug: 'northstar', name: 'Northstar Vendors Marketplace', domain: 'northstar.market', securityLevel: 3, description: 'Commercial vendor marketplace and payment services.' },
-  { slug: 'gardenly', name: 'Gardenly Community Gardens', domain: 'gardenly.green', securityLevel: 1, description: 'Local gardening groups and seed exchanges.' },
-  { slug: 'zeroday', name: 'Zero-Day Bulletin Board', domain: 'zeroday.board', securityLevel: 2, description: 'A technical bulletin board for security researchers.' },
-  { slug: 'retroview', name: 'RetroView Image Gallery', domain: 'retroview.gallery', securityLevel: 0, description: 'An archive of classic computing art and images.' },
-  { slug: 'orbital', name: 'Orbital Freight Logistics', domain: 'orbitalfreight.biz', securityLevel: 2, description: 'Shipping, tracking and freight coordination.' },
-  { slug: 'tinyhome', name: 'Tiny Home Network', domain: 'tinyhomes.network', securityLevel: 1, description: 'Small-space living ideas and discussion.' },
-  { slug: 'bluebird', name: 'Bluebird Media Studio', domain: 'bluebird.media', securityLevel: 2, description: 'An independent digital media studio.' },
-  { slug: 'crown', name: 'Crown Reserve Bank', domain: 'crownreserve.bank', securityLevel: 4, description: 'Private banking and high-value reserve accounts.' },
-  { slug: 'neon', name: 'Neon Circuit Components', domain: 'neoncircuit.parts', securityLevel: 2, description: 'Specialist electronics and computer components.' }
+  { slug: 'finance', name: 'Small Finance Co.', domain: 'smallfinance.local', securityLevel: 0, targetType: 'website', description: 'Small financial-services host; a low-security tutorial target.' },
+  { slug: 'hacker', name: 'Forgetful Hacker', domain: 'forgottenpc.local', securityLevel: 1, targetType: 'npc_workstation', description: 'A personal workstation with basic password protection.' },
+  { slug: 'bank', name: 'First Bank Online', domain: 'firstbank.local', securityLevel: 1, targetType: 'website', description: 'Fictional bank host; customer balances remain in each player sandbox for now.' },
+  { slug: 'pawperfect', name: 'PawPerfect Pet Nutrition', domain: 'pawperfect.pet', securityLevel: 1, targetType: 'website', description: 'Premium nutrition for happy pets.' },
+  { slug: 'chrono', name: 'Chrono Watch Enthusiasts', domain: 'chronowatch.club', securityLevel: 1, targetType: 'website', description: 'A community for horology enthusiasts.' },
+  { slug: 'terry', name: 'Terry Schwarz — Personal Home Page', domain: 'terryschwarz.me', securityLevel: 1, targetType: 'website', description: 'A personal site belonging to Terry Schwarz.' },
+  { slug: 'acorn', name: 'Acorn Student Union', domain: 'acornstudents.org', securityLevel: 0, targetType: 'website', description: 'Campus groups, events and noticeboards.' },
+  { slug: 'pixelarcade', name: 'Pixel Arcade', domain: 'pixelarcade.games', securityLevel: 1, targetType: 'website', description: 'Retro games and online high scores.' },
+  { slug: 'northstar', name: 'Northstar Vendors Marketplace', domain: 'northstar.market', securityLevel: 3, targetType: 'website', description: 'Commercial vendor marketplace and payment services.' },
+  { slug: 'gardenly', name: 'Gardenly Community Gardens', domain: 'gardenly.green', securityLevel: 1, targetType: 'website', description: 'Local gardening groups and seed exchanges.' },
+  { slug: 'zeroday', name: 'Zero-Day Bulletin Board', domain: 'zeroday.board', securityLevel: 2, targetType: 'website', description: 'A technical bulletin board for security researchers.' },
+  { slug: 'retroview', name: 'RetroView Image Gallery', domain: 'retroview.gallery', securityLevel: 0, targetType: 'website', description: 'An archive of classic computing art and images.' },
+  { slug: 'orbital', name: 'Orbital Freight Logistics', domain: 'orbitalfreight.biz', securityLevel: 2, targetType: 'website', description: 'Shipping, tracking and freight coordination.' },
+  { slug: 'tinyhome', name: 'Tiny Home Network', domain: 'tinyhomes.network', securityLevel: 1, targetType: 'website', description: 'Small-space living ideas and discussion.' },
+  { slug: 'bluebird', name: 'Bluebird Media Studio', domain: 'bluebird.media', securityLevel: 2, targetType: 'website', description: 'An independent digital media studio.' },
+  { slug: 'crown', name: 'Crown Reserve Bank', domain: 'crownreserve.bank', securityLevel: 4, targetType: 'website', description: 'Private banking and high-value reserve accounts.' },
+  { slug: 'neon', name: 'Neon Circuit Components', domain: 'neoncircuit.parts', securityLevel: 2, targetType: 'website', description: 'Specialist electronics and computer components.' }
 ];
 const WORLD_ROOM = 'world:lobby';
 const SESSION_ROOM_PREFIX = 'account-session:';
@@ -338,6 +342,7 @@ function mapWorldTarget(row) {
     name: row.name,
     domain: row.domain,
     securityLevel: Number(row.security_level),
+    targetType: row.target_type || 'website',
     description: row.description,
     probeCount: Number(row.probe_count || 0),
     lastProbedByUsername: row.last_probed_by_username || null,
@@ -373,7 +378,7 @@ function emitToSession(sessionId, event, payload) {
 }
 async function readWorldSnapshot(userId) {
   const [targetResult, eventResult, chatResult] = await Promise.all([
-    pool.query(`SELECT t.slug, t.name, t.domain, t.security_level, t.description, t.probe_count,
+    pool.query(`SELECT t.slug, t.name, t.domain, t.security_level, t.target_type, t.description, t.probe_count,
                        t.last_probed_by_username, t.last_probed_at, t.compromised_by_username, t.compromised_at,
                        COALESCE(p.probe_count, 0) AS player_probe_count,
                        p.last_attack_at AS player_last_attack_at, p.last_attack_result AS player_last_attack_result
@@ -1596,7 +1601,7 @@ app.post('/api/world/targets/:slug/probe', requireAuth, worldProbeLimiter, async
           last_probed_at = NOW(),
           updated_at = NOW()
       WHERE slug = $1
-      RETURNING slug, name, domain, security_level, description, probe_count,
+      RETURNING slug, name, domain, security_level, target_type, description, probe_count,
                 last_probed_by_username, last_probed_at, compromised_by_username, compromised_at
     `, [slug, req.session.user.id, req.session.user.username]);
     if (!updated.rowCount) {
@@ -1690,7 +1695,7 @@ app.post('/api/world/targets/:slug/breach', requireAuth, worldBreachLimiter, asy
       const updated = await client.query(`UPDATE netshift_world_targets
         SET compromised_by_user_id = $2, compromised_by_username = $3, compromised_at = NOW(), updated_at = NOW()
         WHERE slug = $1
-        RETURNING slug, name, domain, security_level, description, probe_count,
+        RETURNING slug, name, domain, security_level, target_type, description, probe_count,
                   last_probed_by_username, last_probed_at, compromised_by_user_id, compromised_by_username, compromised_at`,
         [slug, req.session.user.id, req.session.user.username]);
       updatedTargetRow = updated.rows[0];
@@ -1842,19 +1847,57 @@ async function start() {
   }, 30000);
   handoffSweeper.unref();
 
-  // Coordinated database-timestamp-based world inventory refresh. Credential-bearing
-  // hosts use a three-day lockout before their next ordinary five-minute regeneration.
+  // Database-timestamp-based host loot regeneration. Each host is processed in a
+  // transaction with an inventory row lock. Stock is capped by target type; when full,
+  // the oldest generated item is replaced with a new weighted loot-table result. Static
+  // website content is preserved. Credential-bearing hosts retain their three-day lock.
   const worldRegenTicker = setInterval(async () => {
+    let client;
+    let transactionOpen = false;
     try {
-      await pool.query(`UPDATE netshift_world_host_inventory
-        SET stock = COALESCE(stock, '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
-          'id', target_slug || '-warez1-' || floor(extract(epoch FROM NOW())/300)::bigint,
-          'name','Warez Virus L1.vshare','type','software','family','warez','level',1)),
-          money_cents = GREATEST(money_cents, 10000), inventory_version=inventory_version+1,
-          next_regen_at = NOW() + INTERVAL '5 minutes'
-        WHERE next_regen_at IS NOT NULL AND next_regen_at <= NOW()
-          AND (credential_lock_until IS NULL OR credential_lock_until <= NOW())`);
-    } catch (error) { console.error('World inventory regeneration failed:', error.message); }
+      client = await pool.connect();
+      await client.query('BEGIN');
+      transactionOpen = true;
+      const due = await client.query(`
+        SELECT h.target_slug, h.stock, h.inventory_version, h.money_cents, h.next_regen_at,
+               t.name, t.target_type, t.security_level, NOW() AS database_now
+        FROM netshift_world_host_inventory h
+        JOIN netshift_world_targets t ON t.slug = h.target_slug
+        WHERE h.next_regen_at IS NOT NULL AND h.next_regen_at <= NOW()
+          AND (h.credential_lock_until IS NULL OR h.credential_lock_until <= NOW())
+        ORDER BY h.next_regen_at, h.target_slug
+        LIMIT 100
+        FOR UPDATE OF h SKIP LOCKED
+      `);
+      for (const host of due.rows) {
+        if (!Array.isArray(host.stock)) throw new Error(`Host ${host.target_slug} has a malformed stock value; refusing to overwrite it.`);
+        const stock = host.stock;
+        const regeneration = regenerateHostStock(stock, {
+          slug: host.target_slug,
+          name: host.name,
+          targetType: host.target_type,
+          securityLevel: Number(host.security_level)
+        }, { now: new Date(host.database_now) });
+        await client.query(`
+          UPDATE netshift_world_host_inventory
+          SET stock = $2::jsonb,
+              money_cents = GREATEST(money_cents, 10000),
+              inventory_version = CASE WHEN $3::boolean THEN inventory_version + 1 ELSE inventory_version END,
+              next_regen_at = $4::timestamptz + INTERVAL '5 minutes'
+          WHERE target_slug = $1
+        `, [host.target_slug, JSON.stringify(regeneration.stock), regeneration.changed, host.database_now]);
+        if (regeneration.reason === 'NO_REPLACEABLE_LOOT') {
+          console.warn(`Host ${host.target_slug} is full of static items; skipped loot spawn rather than deleting static content.`);
+        }
+      }
+      await client.query('COMMIT');
+      transactionOpen = false;
+    } catch (error) {
+      if (transactionOpen && client) { try { await client.query('ROLLBACK'); } catch (_) {} }
+      console.error('World inventory regeneration failed:', error.message);
+    } finally {
+      client?.release();
+    }
   }, 30000);
   worldRegenTicker.unref();
 

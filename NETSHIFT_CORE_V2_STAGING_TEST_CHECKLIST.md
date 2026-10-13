@@ -136,6 +136,21 @@ fetch('/api/core/hosts/finance/download', {
 
 Chunk 8's new mock SQL adapter covers the transaction control-flow cases above. These manual cases are **not checked** yet: actual PostgreSQL row-locking, rollback and two-account browser behaviour still need to be demonstrated against a disposable staging database. Never use production for these tests.
 
+### F4. Bounded, weighted host loot regeneration (apply only after deploying the regeneration fix)
+
+- [ ] Confirm legacy overfull stock compacts to the configured limit on its next due regeneration: WHOIS-listed websites = 3 items; NPC workstations = 5 items.
+- [ ] Verify the next five-minute regeneration never makes an inventory exceed its type limit. When full, the oldest *generated* loot item is replaced with a newly generated item; fixed/static website content is preserved.
+- [ ] Confirm every new loot spawn has a fresh item ID and `generatedAt` metadata, and the same previous ID is not recycled.
+- [ ] Confirm software family varies through the server-owned loot table rather than always producing Warez Virus L1. Current family weights: `crc` 18, `wwl` 15, `warez` 14, `fc` 10, `uploader` 11, `av` 13, `extractor` 6, `embedder` 6, `popup` 7.
+- [ ] Confirm software level is weighted by the target's `security_level` (the shared-host firewall difficulty), with level weights [L1,L2,L3,L4,L5]: firewall 0 = [96,4,0,0,0], 1 = [86,12,2,0,0], 2 = [72,19,7,2,0], 3 = [60,23,11,5,1], 4 = [50,24,15,8,3], 5 = [40,26,18,11,5]. L1 remains the most common individual result; L5 is rare and increases in likelihood on higher-firewall targets.
+- [ ] Confirm occasional text loot is selected from its own weighted table and does not expose credentials.
+- [ ] Confirm a successful player claim immediately removes the item from authoritative host stock and refreshes the UI; a repeated claim of that ID cannot award it again.
+- [ ] For any future NPC/security sweep removal, ensure the server updates the same locked `netshift_world_host_inventory.stock` row and increments `inventory_version`; never delete only a client-side array entry. Test the real removal action when that gameplay system exists.
+- [ ] Confirm the `hacker` target is persisted as `npc_workstation`; WHOIS-listed seeded targets are `website`. Any future generated NPC workstation must set `target_type='npc_workstation'` explicitly.
+- [ ] Verify the existing three-day `credential_lock_until` gate remains intact after regeneration changes.
+
+The automated helper tests cover the weights, stock caps, oldest-generated replacement and recovery from an overfull legacy inventory. They do **not** prove PostgreSQL lock behaviour or multi-instance Render behaviour. For the live recovery test, record before/after inventory count, version and item IDs; a stock of 42 should fall to 3 for a website after the overdue regeneration is processed, rather than remaining over cap.
+
 ## G. Security and known exclusions
 
 - [x] A regular test account received HTTP 403 from `/api/admin/viewusers` (reported passing on 2026-10-13).

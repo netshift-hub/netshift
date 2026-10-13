@@ -9,6 +9,15 @@
 - Inventory refresh ticker foundation and credential lockout field.
 - Admin roles, audit schema, bans, user listing and moderation endpoints; operator-only grant CLI.
 
+
+## Stage 1 follow-up — bounded host loot regeneration (prepared locally, not yet deployed)
+- Added persisted host target classification (`website` versus `npc_workstation`); the seeded Forgetful Hacker host is an NPC workstation and WHOIS targets are websites.
+- Replaced the unconditional Warez-L1 append ticker with a row-locked, PostgreSQL-timestamp-based loot refresh using a tested server-owned weighted loot table.
+- Enforced stock limits of 3 for websites and 5 for NPC workstations; overfull legacy inventories are compacted at the next due regeneration, preserving fixed content and newer generated loot.
+- A full inventory rotates its oldest generated item for a fresh item ID instead of growing forever. Software-level weights increase with firewall level; L1 remains the most common individual level and L5 remains rare.
+- Added a shared stock-removal helper used by atomic claims and intended for future server-side NPC/security-sweep removal paths. Such system actions must lock/update canonical host stock and increment its version; no not-yet-implemented NPC/sweep behaviour is claimed as live.
+- Added `scripts/check-stage1-host-loot-regeneration.js` to the automated suite. Local `npm run check` passes; PostgreSQL, Render concurrency and live staging regeneration tests remain required before acceptance.
+
 ## Explicitly not complete
 - Full PvP resolution and post-hack immunity.
 - Full UI migration to canonical server inventory/files/bank state.

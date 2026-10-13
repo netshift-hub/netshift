@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "check": "node --check server.js && node scripts/check-client.js && node scripts/check-multiplayer-markers.js && node scripts/check-session-chat.js && node scripts/check-world-compromise.js && node scripts/check-core-v2.js && node scripts/check-game-identities.js && node scripts/check-core-files-ui.js && node scripts/check-stage1-migration-contract.js && node scripts/check-stage1-save-protocol.js && node scripts/check-stage1-client-save-protocol.js && node scripts/check-stage1-save-cutover.js && node scripts/check-stage1-hydration-gate.js && node scripts/check-stage1-canonical-inventory.js && node scripts/check-stage1-host-download-claim.js",
+    "check": "node --check server.js && node scripts/check-client.js && node scripts/check-multiplayer-markers.js && node scripts/check-session-chat.js && node scripts/check-world-compromise.js && node scripts/check-core-v2.js && node scripts/check-game-identities.js && node scripts/check-core-files-ui.js && node scripts/check-stage1-migration-contract.js && node scripts/check-stage1-save-protocol.js && node scripts/check-stage1-client-save-protocol.js && node scripts/check-stage1-save-cutover.js && node scripts/check-stage1-hydration-gate.js && node scripts/check-stage1-canonical-inventory.js && node scripts/check-stage1-host-loot-regeneration.js && node scripts/check-stage1-host-download-claim.js",
     "admin:grant": "node scripts/grant-admin.js"
   },
   "engines": {
