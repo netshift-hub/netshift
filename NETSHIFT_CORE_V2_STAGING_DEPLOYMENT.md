@@ -14,9 +14,13 @@ Do not merge this preview into `main`. Do not grant administrator access on stag
 4. Choose **Repository → Show in Explorer** to open the local repository folder.
 5. Copy the extracted bundle's contents into the repository root and allow matching files to be replaced. Copy the `public` and `scripts` folders as folders. Do not copy any real `.env` file. Keep any existing `package-lock.json`; Render's configured `npm install` command can reconcile it with `package.json`.
 6. Review GitHub Desktop's changed-file list. It should show application/source/docs changes only; it must not show `.env` or `node_modules`.
-7. Commit as `Add NETSHIFT Core v2 staging preview`, then click **Push origin**.
+7. Commit as `Add NETSHIFT identity and SafetyShield polish`, then click **Push origin**.
 8. In Render, confirm `netshift-staging` is connected to `dev-multiplayer-v2` and automatic deploys are enabled. Watch the build and deploy logs. The build should execute `npm install && npm run check`.
 9. Open `https://netshift-staging.onrender.com/api/health`. `ok: true`, `database: connected`, and `realtime: enabled` confirms basic application/database connectivity, not gameplay correctness.
+
+This bundle now also includes `lib/game-identities.js`, `scripts/check-game-identities.js`, `NETSHIFT_STATE_OWNERSHIP_AUDIT.md` and `NETSHIFT_V2_IMPLEMENTATION_PLAN.md`. Those files should appear in the changed-file list.
+
+The identity migration is intentionally limited: on each player's next profile load, a legacy predictable `10.x.x.x` address is replaced once, and a recognisable non-eight-digit legacy player bank number is replaced once. Current eight-digit bank numbers are preserved. This does not modify balances or bank password hashes. Still, deploy to staging first and confirm existing accounts remain usable and identities remain stable across refreshes.
 
 If GitHub Desktop reports a large or unexpected set of changes, stop before committing and review the list. Never switch to `main` for this deployment.
 

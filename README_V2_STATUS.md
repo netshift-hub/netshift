@@ -52,3 +52,17 @@ Run `npm run check`. It checks server syntax, embedded client JavaScript syntax,
 ## Existing deployment environment
 
 The package retains the existing `DATABASE_URL` and `SESSION_SECRET` configuration. Database schema changes are additive and run at application startup. Back up the database before staging this build. Do not deploy to production until the outstanding security and gameplay items above have been completed and tested.
+
+## Latest local implementation slice (2026-10-13)
+
+- `lib/game-identities.js` centralises the generation/shape rules for simulated player identity values.
+- New virtual workstation IPs have mixed 2-/3-digit IPv4 octets inside the private `172.16.0.0/12` range and are never derived from a player's real IP. The database uniqueness constraint is the final collision guard.
+- Existing deterministic `10.x.x.x` IPs are upgraded on the player's next profile load. This migration is conditional and idempotent; new generated IPs do not match the old range.
+- New First Bank account numbers are random eight-digit numbers, not an increasing user-ID sequence. Recognisable legacy server-generated numbers are upgraded on profile load while already-established eight-digit numbers are left unchanged.
+- Player IP is loaded from the server before the post-auth page is rendered. SafetyShield OFF has red status text and a white cross over a red shield; ON remains green.
+- The release plan and current-state ownership audit are in `NETSHIFT_V2_IMPLEMENTATION_PLAN.md` and `NETSHIFT_STATE_OWNERSHIP_AUDIT.md`.
+- `npm run check` passes locally, including a new test of the identity formatting and account-number shape. **This is not a live Neon/Render migration test**; deploy to staging and confirm both existing accounts retain access, each has a stable different IP/account number, and SafetyShield presentation is correct before proceeding to the next phase.
+
+## Remaining production gates
+
+The state audit identified important legacy browser-authoritative state: money/ purchases, software/loadout, local desktop files/folders, older hack outcomes and Router access logs. Do not treat these as server-authoritative until their legacy code paths have been migrated and verified. The full release plan sequences those migrations and the new Archive/Recycle Bin, NPC, PvP, website catalogue, admin MFA and Hall of Fame features.

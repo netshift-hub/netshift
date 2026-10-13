@@ -22,7 +22,11 @@ const requiredServer = [
   'credential_lock_until',
   'shield_has_been_changed',
   'if (current.shield_has_been_changed)',
-  'netshift_admin_roles'
+  'netshift_admin_roles',
+  'upgradeLegacyPlayerIp',
+  'upgradeLegacyPlayerBankNumber',
+  'generateBankAccountNumber',
+  'generateGameIp'
 ];
 const requiredClient = [
   'netshiftCoreShieldDialog',
@@ -34,7 +38,10 @@ const requiredClient = [
   'one hour before you can enable SafetyShield again',
   'netshiftDesktopCreate',
   'New Text Document',
-  'New Folder'
+  'New Folder',
+  'netshiftSafetyShieldIcon',
+  'stroke=\"#fff\" stroke-width=\"4\" stroke-linecap=\"round\"',
+  'await netshiftCoreLoadProfile()'
 ];
 for (const marker of requiredServer) assert.ok(server.includes(marker), `server missing ${marker}`);
 for (const marker of requiredClient) assert.ok(html.includes(marker), `client missing ${marker}`);

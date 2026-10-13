@@ -27,3 +27,13 @@
 - My Computer now displays account number/balance from `/api/core/profile` rather than the shared legacy `100001` demo account.
 - Removed local-demo transfers from the displayed bank dashboard until an atomic server-side transfer/ledger endpoint is implemented.
 - Expanded the staging bank checklist.
+
+## Staging implementation slice — identity presentation and release sequencing
+- Added `lib/game-identities.js` so virtual IP and bank account generation are explicit, reusable, testable helpers rather than logic embedded in the server routes.
+- New simulated workstation IPs use mixed 2-/3-digit octets within the private `172.16.0.0/12` range, never depend on real client IPs, and rely on the database uniqueness constraint plus retry logic.
+- Existing predictable `10.x.x.x` workstation IPs are migrated once when the player's profile is next loaded.
+- New player bank account numbers are random eight-digit strings. Recognisable legacy values (including the earlier deterministic 12-digit values or a persisted six-digit demo value) are upgraded once; established eight-digit values are preserved.
+- Load the server-issued profile before rendering the post-login page so the sidebar/legacy UI uses the player's server-assigned virtual IP instead of a constant placeholder.
+- SafetyShield OFF now renders the heading/status in red with a foreground white cross over a red shield; ON remains green.
+- Added `scripts/check-game-identities.js` and wired it into `npm run check`.
+- Added `NETSHIFT_STATE_OWNERSHIP_AUDIT.md` and `NETSHIFT_V2_IMPLEMENTATION_PLAN.md` as the working audit and dependency-ordered release plan.

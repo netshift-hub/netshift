@@ -12,6 +12,7 @@ const { rateLimit } = require('express-rate-limit');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { worldBreachChance } = require('./lib/world-rules');
+const { generateGameIp, generateBankAccountNumber, legacyDeterministicAccountNumber } = require('./lib/game-identities');
 
 const isProduction = process.env.NODE_ENV === 'production';
 const PORT = Number(process.env.PORT || 3000);
@@ -361,21 +362,94 @@ async function readWorldSnapshot(userId) {
 }
 
 
-function generatedGameIp(userId) {
-  // Stable, unique simulated IPv4 space; never derived from the player's real IP.
-  const n = BigInt(userId);
-  return `10.${Number((n / 65536n) % 200n) + 20}.${Number((n / 254n) % 254n) + 1}.${Number(n % 254n) + 1}`;
+async function ensureUniquePlayerWorldRow(userId) {
+  // Use database uniqueness as the final collision guard. The retry loop means
+  // two players can be created concurrently without sharing a simulated address.
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    try {
+      await pool.query(`INSERT INTO netshift_player_world (user_id, workstation_ip)
+        VALUES ($1, $2::inet) ON CONFLICT (user_id) DO NOTHING`, [userId, generateGameIp()]);
+      return;
+    } catch (error) {
+      if (error.code === '23505' && error.constraint === 'netshift_player_world_workstation_ip_key') continue;
+      throw error;
+    }
+  }
+  throw new Error('Could not allocate a unique simulated workstation IP after 100 attempts.');
 }
+
+async function upgradeLegacyPlayerIp(userId) {
+  const current = await pool.query(`SELECT workstation_ip::text AS ip FROM netshift_player_world WHERE user_id=$1`, [userId]);
+  // Earlier preview builds generated predictable 10.x.x.x addresses from user IDs.
+  // Move those addresses once. New addresses live in 172.16.0.0/12 and will not
+  // match this migration condition again on subsequent application starts.
+  if (!current.rowCount || !current.rows[0].ip.startsWith('10.')) return;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    try {
+      const changed = await pool.query(`UPDATE netshift_player_world
+        SET workstation_ip=$2::inet
+        WHERE user_id=$1 AND workstation_ip << inet '10.0.0.0/8'
+        RETURNING workstation_ip::text AS ip`, [userId, generateGameIp()]);
+      if (changed.rowCount) return;
+      return; // Another concurrent request already upgraded this row.
+    } catch (error) {
+      if (error.code === '23505' && error.constraint === 'netshift_player_world_workstation_ip_key') continue;
+      throw error;
+    }
+  }
+  throw new Error('Could not upgrade legacy simulated workstation IP after 100 attempts.');
+}
+
+async function ensureUniquePlayerBankAccount(userId) {
+  // A pending username is only an internal placeholder until First Bank setup.
+  // Both the number and placeholder are unique, and account-number collisions retry.
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const accountNo = generateBankAccountNumber();
+    const accountUser = `pending_${String(userId)}_${crypto.randomBytes(5).toString('hex')}`;
+    try {
+      await pool.query(`INSERT INTO netshift_bank_accounts
+        (owner_user_id, bank_code, account_number, account_username, balance_cents, is_player)
+        VALUES ($1, 'FIRST', $2, $3, 50000, TRUE) ON CONFLICT (owner_user_id) DO NOTHING`, [userId, accountNo, accountUser]);
+      return;
+    } catch (error) {
+      if (error.code === '23505' && ['netshift_bank_accounts_account_number_key', 'netshift_bank_accounts_account_username_key'].includes(error.constraint)) continue;
+      throw error;
+    }
+  }
+  throw new Error('Could not allocate a unique player bank account after 100 attempts.');
+}
+
+async function upgradeLegacyPlayerBankNumber(userId) {
+  const result = await pool.query(`SELECT account_number, is_player FROM netshift_bank_accounts WHERE owner_user_id=$1`, [userId]);
+  if (!result.rowCount || !result.rows[0].is_player) return;
+  const current = String(result.rows[0].account_number);
+  // Preserve established 8-digit numbers. Upgrade previous preview-generated 12-digit
+  // numbers (and the old six-digit demo number if one was ever persisted server-side).
+  if (/^\d{8}$/.test(current) && current !== legacyDeterministicAccountNumber(userId)) return;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const candidate = generateBankAccountNumber();
+    try {
+      const changed = await pool.query(`UPDATE netshift_bank_accounts
+        SET account_number=$2
+        WHERE owner_user_id=$1 AND account_number=$3
+        AND NOT EXISTS (SELECT 1 FROM netshift_bank_accounts other WHERE other.account_number=$2 AND other.owner_user_id<>$1)
+        RETURNING account_number`, [userId, candidate, current]);
+      if (changed.rowCount) return;
+      const latest = await pool.query('SELECT account_number FROM netshift_bank_accounts WHERE owner_user_id=$1', [userId]);
+      if (!latest.rowCount || String(latest.rows[0].account_number) !== current) return;
+    } catch (error) {
+      if (error.code === '23505' && error.constraint === 'netshift_bank_accounts_account_number_key') continue;
+      throw error;
+    }
+  }
+  throw new Error('Could not upgrade legacy player bank account number after 100 attempts.');
+}
+
 async function ensurePlayerWorld(user) {
-  const ip = generatedGameIp(user.id);
-  await pool.query(`INSERT INTO netshift_player_world (user_id, workstation_ip)
-    VALUES ($1, $2::inet) ON CONFLICT (user_id) DO NOTHING`, [user.id, ip]);
-  // Deterministic account numbers; player credentials are separate from hackable NPC files.
-  const accountNo = `10${String(user.id).padStart(10, '0')}`;
-  const accountUser = `player_${String(user.id)}`;
-  await pool.query(`INSERT INTO netshift_bank_accounts
-    (owner_user_id, bank_code, account_number, account_username, balance_cents, is_player)
-    VALUES ($1, 'FIRST', $2, $3, 50000, TRUE) ON CONFLICT (owner_user_id) DO NOTHING`, [user.id, accountNo, accountUser]);
+  await ensureUniquePlayerWorldRow(user.id);
+  await upgradeLegacyPlayerIp(user.id);
+  await ensureUniquePlayerBankAccount(user.id);
+  await upgradeLegacyPlayerBankNumber(user.id);
   await pool.query(`INSERT INTO netshift_player_files (id, user_id, parent_path, name, item_type, content)
     VALUES ($1, $2, '/', 'README.txt', 'file', 'Welcome to NETSHIFT. Keep notes on IP addresses and passwords here.')
     ON CONFLICT (user_id, parent_path, name) DO NOTHING`, [crypto.randomUUID(), user.id]);

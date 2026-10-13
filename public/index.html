@@ -262,7 +262,7 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
 
-const PLAYER_IP = "10.0.0.7";
+let PLAYER_IP = "172.20.45.201"; // Replaced with the server-issued fictional workstation IP after authentication.
 const $ = id => document.getElementById(id);
 const money = n => "$" + Number(n || 0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -4978,6 +4978,8 @@ function netshiftRestoreSave(snapshot) {
 }
 async function netshiftAfterAuth(user) {
   netshiftSetAuthenticated(user);
+  // Load the authoritative identity before rendering any page that displays the workstation IP.
+  await netshiftCoreLoadProfile();
   let result = { save: null };
   let readFailed = false;
   try { result = await netshiftApi("/api/save", {method:"GET"}); }
@@ -5529,7 +5531,7 @@ if ($("worldTargetSelect")) $("worldTargetSelect").addEventListener("change", ne
 let NETSHIFT_CORE_PROFILE = null;
 async function netshiftCoreLoadProfile() {
   if (!window.NETSHIFT_USER) return null;
-  try { const data = await netshiftApi('/api/core/profile'); NETSHIFT_CORE_PROFILE = data.profile; return data.profile; }
+  try { const data = await netshiftApi('/api/core/profile'); NETSHIFT_CORE_PROFILE = data.profile; if (data.profile?.ip) PLAYER_IP = data.profile.ip; return data.profile; }
   catch (e) { console.warn('Core profile unavailable:', e.message); return null; }
 }
 function netshiftCoreShieldDialog(enabled) {
@@ -5555,10 +5557,19 @@ async function netshiftCoreSetShield(enabled) {
     else toast('SafetyShield change failed: '+e.message);
   }
 }
+function netshiftSafetyShieldIcon(enabled) {
+  const shieldFill = enabled ? '#238b36' : '#c92b2b';
+  const foreground = enabled
+    ? ''
+    : '<path d="M13 13 L27 27 M27 13 L13 27" stroke="#fff" stroke-width="4" stroke-linecap="round"/>';
+  return `<svg role="img" aria-label="SafetyShield ${enabled ? 'enabled' : 'disabled'}" width="34" height="38" viewBox="0 0 40 44" style="flex:none;vertical-align:middle"><path d="M20 3 L35 8 V20 C35 29 28 36 20 41 C12 36 5 29 5 20 V8 Z" fill="${shieldFill}" stroke="#222" stroke-width="2"/>${foreground}</svg>`;
+}
 const netshiftCoreOriginalRenderComputer = renderComputer;
 renderComputer = async function() {
   const profile = await netshiftCoreLoadProfile();
-  const shield = profile ? `<div class="box" style="grid-column:1/-1;border:2px solid #777"><h3 style="color:#55a64b">🛡 SafetyShield</h3><p style="color:#55a64b;font-weight:bold">${profile.safetyShield?'ON — PvP protected':'OFF — vulnerable to player hacks'}</p><p>NPC hackers can attack regardless of this setting. Changing SafetyShield starts a one-hour cooldown.</p><button class="bevel" onclick="netshiftCoreShieldDialog(${!profile.safetyShield})">Turn SafetyShield ${profile.safetyShield?'OFF':'ON'}…</button><p class="small">Server IP: ${esc(profile.ip)}</p></div>` : `<div class="box" style="grid-column:1/-1"><h3>🛡 SafetyShield</h3><p>Sign in to load your server-managed protection setting.</p></div>`;
+  const shieldColour = profile?.safetyShield ? '#238b36' : '#c92323';
+  const shieldIcon = profile ? netshiftSafetyShieldIcon(profile.safetyShield) : '🛡';
+  const shield = profile ? `<div class="box" style="grid-column:1/-1;border:2px solid #777"><h3 style="color:${shieldColour};display:flex;align-items:center;gap:8px">${shieldIcon} SafetyShield</h3><p style="color:${shieldColour};font-weight:bold">${profile.safetyShield?'ON — PvP protected':'OFF — vulnerable to player hacks'}</p><p>NPC hackers can attack regardless of this setting. Changing SafetyShield starts a one-hour cooldown.</p><button class="bevel" onclick="netshiftCoreShieldDialog(${!profile.safetyShield})">Turn SafetyShield ${profile.safetyShield?'OFF':'ON'}…</button><p class="small">Server IP: ${esc(profile.ip)}</p></div>` : `<div class="box" style="grid-column:1/-1"><h3>🛡 SafetyShield</h3><p>Sign in to load your server-managed protection setting.</p></div>`;
   page(frame(`${titlebar('MY COMPUTER — SYSTEM PROPERTIES')}<div class="cardgrid"><div class="box"><h3>CPU</h3><p>Level ${state.cpu}</p></div><div class="box"><h3>Connection</h3><p>Level ${state.connection}</p></div><div class="box"><h3>Firewall</h3><p>Local Firewall L${state.firewall} — active</p></div><div class="box"><h3>Anti-Malware</h3><p>${state.antimalware?'Installed and active':'Not installed'}</p></div><div class="box"><h3>Virtual IP</h3><p>${esc(profile?.ip || PLAYER_IP)}</p></div><div class="box"><h3>Bank account</h3><p>${profile?.bank?.accountNumber ? esc(profile.bank.accountNumber) : 'Not available'} · ${money(profile?.bank?.balance ?? state.accounts.player.balance)}</p>${profile?.bankSetup ? '<p class="small">First Bank credentials created</p>' : '<p class="small">First Bank account setup required</p>'}${link('Open First Bank','firstbank.local')}</div>${shield}</div>`),'My Computer');
 };
 function netshiftRenderUserFolders(){
