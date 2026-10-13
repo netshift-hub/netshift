@@ -4800,6 +4800,13 @@ function adminLogoutV16(site){
  renderFrontV16(site);
 }
 
+// Initialise canonical inventory mirrors before the first desktop render. The active
+// refreshDesktopIcons implementation reads these bindings during startup.
+let NETSHIFT_CORE_FILES = [];
+let NETSHIFT_CORE_SOFTWARE = [];
+let NETSHIFT_CORE_FOLDERS = [];
+let NETSHIFT_CORE_RECYCLE_FILES = [];
+
 if(!activeBrowserSurfaceV16) initBrowserTabsV16();
 updateDesktopShortcutsV16();
 refreshDesktopIcons();
@@ -5897,10 +5904,6 @@ async function netshiftBankLogout() {
 // Core v2 canonical file/desktop integration. The browser arrays below are mirrors only:
 // each canonical item retains its server record ID, type and parent path so views/actions
 // cannot accidentally substitute a legacy row with the same visible filename.
-let NETSHIFT_CORE_FILES = [];
-let NETSHIFT_CORE_SOFTWARE = [];
-let NETSHIFT_CORE_FOLDERS = [];
-let NETSHIFT_CORE_RECYCLE_FILES = [];
 function netshiftCoreFolderLocation(parentPath) {
   const path = typeof parentPath === 'string' && parentPath ? parentPath : '/';
   if (path === '/' || path === '/desktop') return 'desktop';
