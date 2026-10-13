@@ -66,3 +66,14 @@ The package retains the existing `DATABASE_URL` and `SESSION_SECRET` configurati
 ## Remaining production gates
 
 The state audit identified important legacy browser-authoritative state: money/ purchases, software/loadout, local desktop files/folders, older hack outcomes and Router access logs. Do not treat these as server-authoritative until their legacy code paths have been migrated and verified. The full release plan sequences those migrations and the new Archive/Recycle Bin, NPC, PvP, website catalogue, admin MFA and Hall of Fame features.
+
+
+## Latest local implementation slice — 2026-10-13
+
+- **Force Connect:** a password-verified login that finds an unreachable incumbent can offer an explicit takeover. The server checks that the incumbent has not become reachable, updates account ownership transactionally, and revokes the prior session. This has static checks only and must not be treated as staging-verified until tested with two browsers.
+- **File UI foundation:** Core file API supports text file/folder creation, rename/content/location updates, an owner-scoped Recycle Bin, restore and permanent deletion. Right-click New Text Document creates a server-backed `Untitled.txt` with incremented names on conflict and opens an in-game Notepad window with editable filename and body. Server-backed files are hydrated into the UI after login and excluded from the legacy browser-submitted save blob. Old local inventory/software/upload handlers are still not fully migrated.
+- **First Bank display:** My Computer displays `NONE` and hides the bank balance until the player has registered First Bank credentials, even when an account number is reserved server-side. User bank account creation/closure/recreation remains deferred; existing account history will need a non-destructive lifecycle model.
+- **Password reset groundwork:** nullable `email_address` and `email_verified_at` fields plus a table for hashed, expiring, single-use reset tokens are created at startup. No email delivery, mailbox, verification or reset routes/UI exist yet. An in-game-only mailbox is not sufficient as a sole recovery method for a player who cannot log in.
+- **Additional required mail feature:** initial domains `chainmail.net` and `badlook.com`, stable player/site/NPC identities, player-to-player mail, 1,000-message mailbox cap, levels 1–5 Spammer/Jammer (5–25 messages/hour; 80% same-level block baseline), unlevelled Spammer Commander, infected sender hijack, and deceptive/taunting Karmic Email attachments whose actual payload metadata remains server-side. This is planned as the next major feature after state/file/economy foundations, not implemented in this preview.
+
+`npm run check` passes locally. The added checks are static/syntax assertions; no live Neon migration test, browser test of Force Connect, or end-to-end Notepad test was run for this slice.

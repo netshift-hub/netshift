@@ -50,6 +50,25 @@ async function initialiseDatabase() {
       password_hash TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+    -- Email identity is optional until the in-game mail system is introduced. Accounts
+    -- may predate their NETSHIFT email address; never infer/reset bank credentials here.
+    ALTER TABLE netshift_users
+      ADD COLUMN IF NOT EXISTS email_address VARCHAR(254),
+      ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ;
+    CREATE UNIQUE INDEX IF NOT EXISTS netshift_users_email_lower_unique
+      ON netshift_users (LOWER(email_address)) WHERE email_address IS NOT NULL;
+    CREATE TABLE IF NOT EXISTS netshift_password_reset_tokens (
+      id UUID PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES netshift_users(id) ON DELETE CASCADE,
+      email_address VARCHAR(254) NOT NULL,
+      token_hash CHAR(64) NOT NULL UNIQUE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      used_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS netshift_password_reset_user_idx
+      ON netshift_password_reset_tokens (user_id, created_at DESC);
+
     CREATE TABLE IF NOT EXISTS netshift_saves (
       user_id BIGINT PRIMARY KEY REFERENCES netshift_users(id) ON DELETE CASCADE,
       save_data JSONB NOT NULL,
@@ -187,7 +206,14 @@ async function initialiseDatabase() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE(user_id, parent_path, name)
     );
-    CREATE INDEX IF NOT EXISTS netshift_player_files_user_idx ON netshift_player_files(user_id, deleted_at, parent_path);
+    ALTER TABLE netshift_player_files ADD COLUMN IF NOT EXISTS recycle_bin_at TIMESTAMPTZ;
+    -- The previous full unique constraint prevented reusing a filename after it was
+    -- moved to the Recycle Bin. Active files/folders alone need unique names.
+    ALTER TABLE netshift_player_files DROP CONSTRAINT IF EXISTS netshift_player_files_user_id_parent_path_name_key;
+    CREATE UNIQUE INDEX IF NOT EXISTS netshift_player_files_active_name_idx
+      ON netshift_player_files(user_id, parent_path, name)
+      WHERE deleted_at IS NULL AND recycle_bin_at IS NULL;
+    CREATE INDEX IF NOT EXISTS netshift_player_files_user_idx ON netshift_player_files(user_id, deleted_at, recycle_bin_at, parent_path);
     CREATE TABLE IF NOT EXISTS netshift_world_host_inventory (
       target_slug VARCHAR(40) PRIMARY KEY REFERENCES netshift_world_targets(slug) ON DELETE CASCADE,
       stock JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -452,7 +478,7 @@ async function ensurePlayerWorld(user) {
   await upgradeLegacyPlayerBankNumber(user.id);
   await pool.query(`INSERT INTO netshift_player_files (id, user_id, parent_path, name, item_type, content)
     VALUES ($1, $2, '/', 'README.txt', 'file', 'Welcome to NETSHIFT. Keep notes on IP addresses and passwords here.')
-    ON CONFLICT (user_id, parent_path, name) DO NOTHING`, [crypto.randomUUID(), user.id]);
+    ON CONFLICT DO NOTHING`, [crypto.randomUUID(), user.id]);
   return (await pool.query(`SELECT p.workstation_ip::text AS workstation_ip, p.safety_shield, p.shield_changed_at,
       p.pvp_immune_until, p.bank_setup_at, b.bank_code, b.account_number, b.account_username,
       b.balance_cents, b.password_hash IS NOT NULL AS bank_setup
@@ -579,6 +605,7 @@ async function activatePendingLoginSession(req, user) {
   req.session.user = safeUser(user);
   delete req.session.pendingLoginUser;
   delete req.session.pendingHandoffId;
+  delete req.session.pendingForceConnect;
   await saveSession(req);
   return req.session.user;
 }
@@ -702,6 +729,10 @@ app.get('/api/auth/me', async (req, res, next) => {
         return res.json({ user: null, pendingHandoffId: req.session.pendingHandoffId,
           pendingUsername: req.session.pendingLoginUser.username });
       }
+      if (req.session.pendingForceConnect) {
+        return res.json({ user: null, pendingForceConnect: true,
+          pendingUsername: req.session.pendingLoginUser.username });
+      }
       await destroyRequestSession(req, res);
       return res.json({ user: null });
     }
@@ -772,15 +803,80 @@ app.post('/api/auth/login', authLimiter, async (req, res, next) => {
         waitingFor: user.username, expiresAt: ownership.expiresAt.toISOString(),
         message: 'This account is active elsewhere. The current session must approve the sign-in.' });
     }
-    await destroyRequestSession(req, res);
+    // Keep the password-verified pending session when the incumbent cannot be reached.
+    // This lets the player explicitly request a takeover without entering the password again.
     if (ownership.kind === 'unreachable') {
-      return res.status(409).json({ error: 'This account is still signed in, but its active session cannot currently be reached. Reconnect that session or wait for it to become inactive before retrying.', code: 'ACTIVE_SESSION_UNREACHABLE' });
+      req.session.pendingForceConnect = true;
+      await saveSession(req);
+      return res.status(409).json({ error: 'This account is still signed in, but its active session cannot currently be reached. You may force-connect to take over if it remains unreachable.', code: 'ACTIVE_SESSION_UNREACHABLE' });
     }
+    await destroyRequestSession(req, res);
     return res.status(409).json({ error: 'A sign-in handoff is already pending for this account. Ask the active session to respond, then try again.', code: 'HANDOFF_IN_PROGRESS' });
   } catch (error) {
     if (pendingSessionCreated) await destroyRequestSession(req, res);
     next(error);
   }
+});
+
+app.post('/api/auth/force-connect', authLimiter, async (req, res, next) => {
+  const pendingUser = req.session.pendingLoginUser;
+  if (req.session.user) return res.status(409).json({ error: 'This browser is already signed in.', code: 'ALREADY_SIGNED_IN' });
+  if (!pendingUser?.id || !pendingUser?.username) return res.status(401).json({ error: 'Sign in with the correct username and password before requesting Force Connect.', code: 'FORCE_CONNECT_REQUIRES_VERIFIED_LOGIN' });
+
+  const client = await pool.connect();
+  let displacedSessionId = null;
+  let user = null;
+  try {
+    await client.query('BEGIN');
+    const account = await client.query('SELECT id, username FROM netshift_users WHERE id=$1 FOR UPDATE', [pendingUser.id]);
+    if (!account.rowCount || account.rows[0].username !== pendingUser.username) {
+      await client.query('ROLLBACK');
+      await destroyRequestSession(req, res);
+      return res.status(401).json({ error: 'The pending login is no longer valid. Sign in again.', code: 'FORCE_CONNECT_LOGIN_EXPIRED' });
+    }
+    user = account.rows[0];
+    const ban = await client.query('SELECT 1 FROM netshift_user_bans WHERE user_id=$1', [user.id]);
+    if (ban.rowCount) {
+      await client.query('ROLLBACK');
+      await destroyRequestSession(req, res);
+      return res.status(403).json({ error: 'This account is banned.', code: 'ACCOUNT_BANNED' });
+    }
+
+    await client.query(`INSERT INTO netshift_account_ownership (user_id, session_id)
+      VALUES ($1,$2) ON CONFLICT (user_id) DO NOTHING`, [user.id, req.sessionID]);
+    const ownership = await client.query('SELECT session_id FROM netshift_account_ownership WHERE user_id=$1 FOR UPDATE', [user.id]);
+    if (!ownership.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'The current session could not claim account ownership. Retry sign-in.', code: 'FORCE_CONNECT_RACE' });
+    }
+    const currentOwner = ownership.rows[0].session_id;
+    if (currentOwner !== req.sessionID && hasConnectedSession(currentOwner)) {
+      await client.query('ROLLBACK');
+      await destroyRequestSession(req, res);
+      return res.status(409).json({ error: 'The existing session has become reachable. Sign in again to request the normal handoff; Force Connect is only allowed for an unreachable session.', code: 'ACTIVE_SESSION_REACHABLE' });
+    }
+    displacedSessionId = currentOwner === req.sessionID ? null : currentOwner;
+    await client.query(`UPDATE netshift_account_ownership
+      SET session_id=$2, claimed_at=NOW(), last_seen_at=NOW() WHERE user_id=$1`, [user.id, req.sessionID]);
+    await client.query(`UPDATE netshift_login_handoffs SET status='cancelled', resolved_at=NOW()
+      WHERE user_id=$1 AND status='pending'`, [user.id]);
+    if (displacedSessionId) await client.query('DELETE FROM netshift_sessions WHERE sid=$1', [displacedSessionId]);
+    await client.query('COMMIT');
+  } catch (error) {
+    try { await client.query('ROLLBACK'); } catch (_) {}
+    return next(error);
+  } finally { client.release(); }
+
+  // Defensive socket revocation in case a socket reconnects between the reachability check
+  // and ownership change. Any subsequent authenticated request also fails the ownership guard.
+  if (displacedSessionId && io) {
+    for (const socket of io.sockets.sockets.values()) {
+      if (socket.data.sessionId === displacedSessionId) socket.disconnect(true);
+    }
+  }
+  await ensurePlayerWorld(user);
+  await activatePendingLoginSession(req, user);
+  res.json({ user: safeUser(user), forceConnected: true, message: 'Force Connect succeeded. The previous unreachable session no longer owns this account.' });
 });
 
 app.post('/api/auth/heartbeat', requireAuth, (_req, res) => {
@@ -1114,10 +1210,40 @@ app.post('/api/core/bank/logout', requireAuth, async (req, res, next) => {
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
+function validPlayerFileName(name) {
+  return typeof name === 'string' && name.trim().length > 0 && name.trim().length <= 180 &&
+    !/[\\/\0]/.test(name.trim()) && !['.', '..'].includes(name.trim());
+}
+function validPlayerFileParent(parent) {
+  return typeof parent === 'string' && parent.startsWith('/') && parent.length <= 500 && !parent.includes('..');
+}
+async function playerFileParentExists(userId, parent, client = pool) {
+  // Desktop, Downloads and Archive are virtual top-level locations rather than folder rows.
+  if (['/', '/downloads', '/archive', '/desktop'].includes(parent)) return true;
+  const segments = parent.split('/').filter(Boolean);
+  if (!segments.length) return true;
+  const parentName = segments.at(-1);
+  const parentPath = segments.length > 1 ? '/' + segments.slice(0, -1).join('/') : '/';
+  const exists = await client.query(`SELECT 1 FROM netshift_player_files
+    WHERE user_id=$1 AND name=$2 AND parent_path=$3 AND item_type='folder'
+      AND deleted_at IS NULL AND recycle_bin_at IS NULL`, [userId, parentName, parentPath]);
+  return Boolean(exists.rowCount);
+}
 app.get('/api/core/files', requireAuth, async (req, res, next) => {
   try {
-    const rows = await pool.query(`SELECT id, parent_path, name, item_type, mime_type, content, software_family, software_level, created_at, updated_at
-      FROM netshift_player_files WHERE user_id=$1 AND deleted_at IS NULL ORDER BY parent_path, item_type DESC, name`, [req.session.user.id]);
+    const rows = await pool.query(`SELECT id, parent_path, name, item_type, mime_type, content,
+      software_family, software_level, created_at, updated_at
+      FROM netshift_player_files WHERE user_id=$1 AND deleted_at IS NULL AND recycle_bin_at IS NULL
+      ORDER BY parent_path, item_type DESC, name`, [req.session.user.id]);
+    res.json({ files: rows.rows });
+  } catch (e) { next(e); }
+});
+app.get('/api/core/files/recycle-bin', requireAuth, async (req, res, next) => {
+  try {
+    const rows = await pool.query(`SELECT id, parent_path, name, item_type, mime_type, content,
+      software_family, software_level, created_at, updated_at, recycle_bin_at
+      FROM netshift_player_files WHERE user_id=$1 AND deleted_at IS NULL AND recycle_bin_at IS NOT NULL
+      ORDER BY recycle_bin_at DESC`, [req.session.user.id]);
     res.json({ files: rows.rows });
   } catch (e) { next(e); }
 });
@@ -1126,38 +1252,84 @@ app.post('/api/core/files', requireAuth, async (req, res, next) => {
   const parent = typeof req.body?.parentPath === 'string' ? req.body.parentPath : '/';
   const type = req.body?.type;
   const content = typeof req.body?.content === 'string' ? req.body.content : '';
-  if (!name || name.length > 180 || /[\\/\0]/.test(name) || name === '.' || name === '..') return res.status(400).json({ error: 'Invalid file or folder name.' });
-  if (!parent.startsWith('/') || parent.length > 500 || parent.includes('..')) return res.status(400).json({ error: 'Invalid folder path.' });
+  if (!validPlayerFileName(name)) return res.status(400).json({ error: 'Invalid file or folder name.' });
+  if (!validPlayerFileParent(parent)) return res.status(400).json({ error: 'Invalid folder path.' });
   if (!['file','folder'].includes(type)) return res.status(400).json({ error: 'type must be file or folder.' });
   if (content.length > 100000) return res.status(413).json({ error: 'Text files are limited to 100 KB.' });
   try {
     if (!await requireSessionOwnership(req, res)) return;
-    const segments = parent.split('/').filter(Boolean);
-    const parentName = segments.at(-1);
-    const parentPath = segments.length > 1 ? '/' + segments.slice(0, -1).join('/') : '/';
-    const parentExists = parent === '/' || (await pool.query(`SELECT 1 FROM netshift_player_files WHERE user_id=$1 AND name=$2 AND parent_path=$3 AND item_type='folder' AND deleted_at IS NULL`, [req.session.user.id, parentName, parentPath])).rowCount;
-    if (!parentExists) return res.status(404).json({ error: 'Parent folder not found.' });
+    if (!await playerFileParentExists(req.session.user.id, parent)) return res.status(404).json({ error: 'Parent folder not found.' });
     const id = crypto.randomUUID();
     const result = await pool.query(`INSERT INTO netshift_player_files (id,user_id,parent_path,name,item_type,content)
-      VALUES ($1,$2,$3,$4,$5,$6) RETURNING id,parent_path,name,item_type,content,created_at`, [id, req.session.user.id, parent, name, type, type === 'folder' ? '' : content]);
+      VALUES ($1,$2,$3,$4,$5,$6)
+      RETURNING id,parent_path,name,item_type,mime_type,content,software_family,software_level,created_at,updated_at`,
+      [id, req.session.user.id, parent, name, type, type === 'folder' ? '' : content]);
     res.status(201).json({ file: result.rows[0] });
   } catch (e) { if (e.code === '23505') return res.status(409).json({ error: 'A file or folder with that name already exists here.' }); next(e); }
 });
 app.put('/api/core/files/:id', requireAuth, async (req, res, next) => {
   const content = typeof req.body?.content === 'string' ? req.body.content : null;
+  const name = req.body?.name === undefined ? null : (typeof req.body.name === 'string' ? req.body.name.trim() : '');
+  const parent = req.body?.parentPath === undefined ? null : req.body.parentPath;
   if (content === null || content.length > 100000) return res.status(400).json({ error: 'Provide text content up to 100 KB.' });
+  if (name !== null && !validPlayerFileName(name)) return res.status(400).json({ error: 'Invalid filename.' });
+  if (parent !== null && !validPlayerFileParent(parent)) return res.status(400).json({ error: 'Invalid folder path.' });
+  const c = await pool.connect();
   try {
     if (!await requireSessionOwnership(req, res)) return;
-    const result = await pool.query(`UPDATE netshift_player_files SET content=$3,updated_at=NOW() WHERE id=$1 AND user_id=$2 AND item_type='file' AND deleted_at IS NULL RETURNING id,name,content,updated_at`, [req.params.id, req.session.user.id, content]);
-    if (!result.rowCount) return res.status(404).json({ error: 'File not found or not editable.' });
+    await c.query('BEGIN');
+    const current = await c.query(`SELECT id,name,parent_path FROM netshift_player_files
+      WHERE id=$1 AND user_id=$2 AND item_type='file' AND deleted_at IS NULL AND recycle_bin_at IS NULL FOR UPDATE`,
+      [req.params.id, req.session.user.id]);
+    if (!current.rowCount) { await c.query('ROLLBACK'); return res.status(404).json({ error: 'File not found or not editable.' }); }
+    const nextName = name ?? current.rows[0].name;
+    const nextParent = parent ?? current.rows[0].parent_path;
+    if (!await playerFileParentExists(req.session.user.id, nextParent, c)) {
+      await c.query('ROLLBACK'); return res.status(404).json({ error: 'Parent folder not found.' });
+    }
+    const result = await c.query(`UPDATE netshift_player_files SET content=$3,name=$4,parent_path=$5,updated_at=NOW()
+      WHERE id=$1 AND user_id=$2 AND item_type='file' AND deleted_at IS NULL AND recycle_bin_at IS NULL
+      RETURNING id,parent_path,name,item_type,mime_type,content,software_family,software_level,created_at,updated_at`,
+      [req.params.id, req.session.user.id, content, nextName, nextParent]);
+    await c.query('COMMIT');
     res.json({ file: result.rows[0] });
-  } catch (e) { next(e); }
+  } catch (e) {
+    try { await c.query('ROLLBACK'); } catch (_) {}
+    if (e.code === '23505') return res.status(409).json({ error: 'A file with that name already exists in this location.' });
+    next(e);
+  } finally { c.release(); }
 });
 app.delete('/api/core/files/:id', requireAuth, async (req, res, next) => {
   try {
     if (!await requireSessionOwnership(req, res)) return;
-    const result = await pool.query(`UPDATE netshift_player_files SET deleted_at=NOW(),updated_at=NOW() WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL RETURNING id,name`, [req.params.id, req.session.user.id]);
+    const result = await pool.query(`UPDATE netshift_player_files SET recycle_bin_at=NOW(),updated_at=NOW()
+      WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL AND recycle_bin_at IS NULL RETURNING id,name,parent_path,item_type,recycle_bin_at`,
+      [req.params.id, req.session.user.id]);
     if (!result.rowCount) return res.status(404).json({ error: 'File not found.' });
+    res.json({ ok: true, deleted: result.rows[0] });
+  } catch (e) { next(e); }
+});
+app.post('/api/core/files/:id/restore', requireAuth, async (req, res, next) => {
+  try {
+    if (!await requireSessionOwnership(req, res)) return;
+    const result = await pool.query(`UPDATE netshift_player_files SET recycle_bin_at=NULL,updated_at=NOW()
+      WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL AND recycle_bin_at IS NOT NULL
+      RETURNING id,parent_path,name,item_type,mime_type,content,software_family,software_level,created_at,updated_at`,
+      [req.params.id, req.session.user.id]);
+    if (!result.rowCount) return res.status(404).json({ error: 'Recycled file not found.' });
+    res.json({ ok: true, file: result.rows[0] });
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ error: 'A file with that name already exists here. Rename the existing file before restoring.' });
+    next(e);
+  }
+});
+app.delete('/api/core/files/:id/permanent', requireAuth, async (req, res, next) => {
+  try {
+    if (!await requireSessionOwnership(req, res)) return;
+    const result = await pool.query(`DELETE FROM netshift_player_files
+      WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL AND recycle_bin_at IS NOT NULL RETURNING id,name`,
+      [req.params.id, req.session.user.id]);
+    if (!result.rowCount) return res.status(404).json({ error: 'Recycled file not found.' });
     res.json({ ok: true, deleted: result.rows[0] });
   } catch (e) { next(e); }
 });
@@ -1184,7 +1356,7 @@ app.post('/api/core/hosts/:slug/download', requireAuth, async (req, res, next) =
       await c.query(`INSERT INTO netshift_player_files
         (id,user_id,parent_path,name,item_type,content,software_family,software_level)
         VALUES($1,$2,'/downloads',$3,$4,$5,$6,$7)
-        ON CONFLICT(user_id,parent_path,name) DO NOTHING`, [crypto.randomUUID(), req.session.user.id, itemName, isSoftware ? 'software' : 'file', String(item.content || ''), isSoftware ? String(item.family || 'utility') : null, isSoftware ? Math.max(1, Math.min(6, Number(item.level) || 1)) : null]);
+        ON CONFLICT DO NOTHING`, [crypto.randomUUID(), req.session.user.id, itemName, isSoftware ? 'software' : 'file', String(item.content || ''), isSoftware ? String(item.family || 'utility') : null, isSoftware ? Math.max(1, Math.min(6, Number(item.level) || 1)) : null]);
       await c.query('COMMIT');
       res.json({ ok: true, item, message: 'Download complete.' });
     } catch (e) { try { await c.query('ROLLBACK'); } catch (_) {} throw e; } finally { c.release(); }

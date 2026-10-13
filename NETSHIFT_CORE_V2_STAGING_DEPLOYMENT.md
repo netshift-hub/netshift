@@ -14,7 +14,7 @@ Do not merge this preview into `main`. Do not grant administrator access on stag
 4. Choose **Repository → Show in Explorer** to open the local repository folder.
 5. Copy the extracted bundle's contents into the repository root and allow matching files to be replaced. Copy the `public` and `scripts` folders as folders. Do not copy any real `.env` file. Keep any existing `package-lock.json`; Render's configured `npm install` command can reconcile it with `package.json`.
 6. Review GitHub Desktop's changed-file list. It should show application/source/docs changes only; it must not show `.env` or `node_modules`.
-7. Commit as `Add NETSHIFT identity and SafetyShield polish`, then click **Push origin**.
+7. Commit as `Add server-backed desktop files and Force Connect`, then click **Push origin**.
 8. In Render, confirm `netshift-staging` is connected to `dev-multiplayer-v2` and automatic deploys are enabled. Watch the build and deploy logs. The build should execute `npm install && npm run check`.
 9. Open `https://netshift-staging.onrender.com/api/health`. `ok: true`, `database: connected`, and `realtime: enabled` confirms basic application/database connectivity, not gameplay correctness.
 
@@ -38,3 +38,8 @@ Do not put credentials in GitHub, this bundle, or chat. The `.gitignore` exclude
 ## Rollback
 
 If deployment fails, use Render's deployment history to redeploy the last known-good v1.3 deployment. Alternatively, revert the v2 commit on `dev-multiplayer-v2` and push the revert. Do not revert or redeploy `main` as part of staging recovery.
+
+
+## Latest bundle contents
+
+This local bundle adds an in-game Notepad tied to `/api/core/files`, server-owned recycle/restore/delete operations, a Force Connect path for unreachable incumbent sessions, nullable account-email/recovery-token schema groundwork, and the `NONE` bank-number display before First Bank setup. Local checks pass, but the SQL migration and browser flows need staging verification. Do not promote to `main`.

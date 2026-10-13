@@ -238,6 +238,7 @@
         <button class="bevel" type="submit">Create account</button>
         <p class="account-small">Already registered? <button class="account-link" type="button" onclick="showAccountForm('login')">Return to sign in</button></p>
       </form>
+      <button id="forceConnectButton" class="bevel" type="button" onclick="netshiftForceConnect()" hidden style="margin-top:8px">Force Connect — take over unreachable session</button>
       <button id="cancelHandoffButton" class="bevel" type="button" onclick="netshiftCancelHandoff()" hidden style="margin-top:8px">Cancel sign-in request</button>
       <p class="account-small" style="margin-bottom:0">Use a unique password. Password recovery and email verification are not included in this first build; save your credentials safely.</p>
     </div>
@@ -4828,6 +4829,7 @@ function showAccountForm(which) {
   login.hidden = registering; register.hidden = !registering;
   $("authTitle").textContent = registering ? "NETSHIFT Online — Create Account" : "NETSHIFT Online — Account Sign In";
   netshiftSetAuthMessage("");
+  const forceButton = $("forceConnectButton"); if (forceButton) forceButton.hidden = true;
   const first = $(registering ? "registerUsername" : "loginUsername");
   if (first) first.focus();
 }
@@ -4894,6 +4896,11 @@ function netshiftSnapshot() {
   const address = primary?.active?.address || $("address")?.value || "whois.com";
   // These are web-session state, not persistent progress. Require fresh logins after reload.
   delete safeState.browserSurfacesV16;
+  // Core API files/folders and recycle-bin rows are canonical server records.
+  // Do not mirror their contents into the browser-submitted legacy save document.
+  if (Array.isArray(safeState.localFiles)) safeState.localFiles = safeState.localFiles.filter(file => !file?._coreFileId);
+  if (Array.isArray(safeState.userFoldersV2)) safeState.userFoldersV2 = safeState.userFoldersV2.filter(folder => !folder?._coreFolderId);
+  if (Array.isArray(safeState.recycleBin)) safeState.recycleBin = safeState.recycleBin.filter(entry => !entry?._coreFileId);
   safeState.bankSession = null;
   safeState.bank2Session = null;
   safeState.editingLog = false;
@@ -5000,6 +5007,9 @@ async function netshiftAfterAuth(user) {
     state.accounts.player.name = user.username;
     go("whois.com", false);
   }
+  // Merge the canonical server-side file inventory after restore so old save data
+  // cannot overwrite file content, filename, location or recycle-bin state.
+  await netshiftCoreLoadFiles({ quiet: true });
   // When a load failed, don't overwrite an existing cloud save automatically.
   NETSHIFT_LAST_SAVED_FINGERPRINT = readFailed ? "__save_read_failed__" : netshiftFingerprint(netshiftSnapshot());
   if (!readFailed) netshiftSetSaveStatus(restored ? "Cloud save loaded" : "New game · cloud saves on");
@@ -5211,6 +5221,8 @@ async function netshiftHandleAuthSubmit(event, mode) {
     await netshiftAfterAuth(result.user);
   } catch (error) {
     netshiftSetAuthMessage(error.message, "error");
+    const forceButton = $("forceConnectButton");
+    if (forceButton) forceButton.hidden = error.code !== "ACTIVE_SESSION_UNREACHABLE";
   } finally {
     if (submit) { submit.textContent = isRegister ? "Create account" : "Connect"; submit.disabled = !!NETSHIFT_HANDOFF_POLL_ID; }
   }
@@ -5270,6 +5282,9 @@ window.addEventListener("pagehide", () => {
       if (result.pendingHandoffId) {
         netshiftSetAuthMessage('A sign-in request is already waiting for the active session to respond. Keep this page open.', 'success');
         netshiftBeginHandoffPoll(result.pendingHandoffId);
+      } else if (result.pendingForceConnect) {
+        netshiftSetAuthMessage(`The previous sign-in for ${result.pendingUsername || 'this account'} confirmed the password but could not reach the active session. You can force-connect or reload to abandon the request.`, 'error');
+        $('forceConnectButton').hidden = false;
       } else if (result.code === 'SESSION_REVOKED') netshiftSetAuthMessage(result.message || 'This browser no longer owns the account. Sign in to request access.', 'error');
     }
   } catch (error) {
@@ -5570,7 +5585,7 @@ renderComputer = async function() {
   const shieldColour = profile?.safetyShield ? '#238b36' : '#c92323';
   const shieldIcon = profile ? netshiftSafetyShieldIcon(profile.safetyShield) : '🛡';
   const shield = profile ? `<div class="box" style="grid-column:1/-1;border:2px solid #777"><h3 style="color:${shieldColour};display:flex;align-items:center;gap:8px">${shieldIcon} SafetyShield</h3><p style="color:${shieldColour};font-weight:bold">${profile.safetyShield?'ON — PvP protected':'OFF — vulnerable to player hacks'}</p><p>NPC hackers can attack regardless of this setting. Changing SafetyShield starts a one-hour cooldown.</p><button class="bevel" onclick="netshiftCoreShieldDialog(${!profile.safetyShield})">Turn SafetyShield ${profile.safetyShield?'OFF':'ON'}…</button><p class="small">Server IP: ${esc(profile.ip)}</p></div>` : `<div class="box" style="grid-column:1/-1"><h3>🛡 SafetyShield</h3><p>Sign in to load your server-managed protection setting.</p></div>`;
-  page(frame(`${titlebar('MY COMPUTER — SYSTEM PROPERTIES')}<div class="cardgrid"><div class="box"><h3>CPU</h3><p>Level ${state.cpu}</p></div><div class="box"><h3>Connection</h3><p>Level ${state.connection}</p></div><div class="box"><h3>Firewall</h3><p>Local Firewall L${state.firewall} — active</p></div><div class="box"><h3>Anti-Malware</h3><p>${state.antimalware?'Installed and active':'Not installed'}</p></div><div class="box"><h3>Virtual IP</h3><p>${esc(profile?.ip || PLAYER_IP)}</p></div><div class="box"><h3>Bank account</h3><p>${profile?.bank?.accountNumber ? esc(profile.bank.accountNumber) : 'Not available'} · ${money(profile?.bank?.balance ?? state.accounts.player.balance)}</p>${profile?.bankSetup ? '<p class="small">First Bank credentials created</p>' : '<p class="small">First Bank account setup required</p>'}${link('Open First Bank','firstbank.local')}</div>${shield}</div>`),'My Computer');
+  page(frame(`${titlebar('MY COMPUTER — SYSTEM PROPERTIES')}<div class="cardgrid"><div class="box"><h3>CPU</h3><p>Level ${state.cpu}</p></div><div class="box"><h3>Connection</h3><p>Level ${state.connection}</p></div><div class="box"><h3>Firewall</h3><p>Local Firewall L${state.firewall} — active</p></div><div class="box"><h3>Anti-Malware</h3><p>${state.antimalware?'Installed and active':'Not installed'}</p></div><div class="box"><h3>Virtual IP</h3><p>${esc(profile?.ip || PLAYER_IP)}</p></div><div class="box"><h3>Bank account</h3><p>${profile?.bankSetup && profile?.bank?.accountNumber ? esc(profile.bank.accountNumber) : 'NONE'} · ${profile?.bankSetup ? money(profile.bank.balance) : '—'}</p>${profile?.bankSetup ? '<p class="small">First Bank credentials created</p>' : '<p class="small">First Bank account setup required</p>'}${link('Open First Bank','firstbank.local')}</div>${shield}</div>`),'My Computer');
 };
 function netshiftRenderUserFolders(){
   const strip=document.getElementById('desktopIcons');if(!strip)return;
@@ -5578,11 +5593,8 @@ function netshiftRenderUserFolders(){
   (state.userFoldersV2||[]).forEach(folder=>{const el=document.createElement('div');el.className='deskicon';el.dataset.userFolderV2=folder.name;el.innerHTML='<span>📁</span>'+esc(folder.name);el.title='User-created folder';el.ondblclick=()=>toast('Folder created in the local desktop model. Persistent Explorer integration is part of the next migration step.');el.oncontextmenu=(e)=>{e.preventDefault();toast('Folder: '+folder.name);};strip.appendChild(el);});
 }
 function netshiftDesktopCreate(type) {
-  const name=prompt(type==='folder'?'New folder name:':'New text file name: ',type==='folder'?'New Folder':'New Text Document.txt');
-  if(!name)return; const clean=name.trim(); if(!clean||clean.length>180||/[\\/]/.test(clean)){toast('Choose a valid name.');return;}
-  if(type==='folder') { state.userFoldersV2=state.userFoldersV2||[]; if(state.userFoldersV2.some(x=>x.name.toLowerCase()===clean.toLowerCase()))return toast('That folder already exists.');state.userFoldersV2.push({name:clean,createdAt:Date.now()});localLog('Created folder '+clean+'.');toast('Folder created.'); }
-  else { if(state.localFiles.some(x=>x.name.toLowerCase()===clean.toLowerCase()))return toast('A file with that name already exists.');const content=prompt('Initial text (you can edit it later):','')??'';state.localFiles.push({name:clean,content,kind:'Text document'});state.localFileFolders=state.localFileFolders||{};state.localFileFolders[clean]='desktop';localLog('Created text file '+clean+'.');toast('Text file created.'); }
-  refreshExplorerV11();refreshDesktopIcons();netshiftRenderUserFolders();
+  if (!window.NETSHIFT_USER) { toast('Sign in before creating files.'); return; }
+  netshiftCoreCreateDesktopItem(type).catch(error => toast('Could not create item: ' + error.message));
 }
 document.addEventListener('contextmenu', event=>{
   const desktop=event.target.closest('#desktopIcons,.desktop,.wallpaper');
@@ -5649,6 +5661,305 @@ async function netshiftBankLogout() {
   catch (e) { toast('Bank sign-out failed: ' + e.message); return; }
   toast('Signed out of First Bank.');
   await renderBankFront();
+}
+
+
+// Core v2 canonical file/desktop integration. The legacy game may retain temporary
+// local files for older mechanics, but Core files are always refreshed from the server.
+let NETSHIFT_CORE_FILES = [];
+let NETSHIFT_CORE_RECYCLE_FILES = [];
+function netshiftCoreFolderLocation(parentPath) {
+  if (parentPath === '/' || parentPath === '/desktop') return 'desktop';
+  if (parentPath === '/downloads') return 'downloads';
+  if (parentPath === '/archive') return 'archive';
+  return parentPath;
+}
+function netshiftCoreMapFile(row) {
+  const mapped = {
+    name: row.name,
+    content: row.content || '',
+    kind: row.item_type === 'software' ? 'Software' : (row.mime_type || 'Text document'),
+    _coreFileId: row.id,
+    _coreParentPath: row.parent_path || '/',
+    _coreItemType: row.item_type,
+    _coreMimeType: row.mime_type || 'text/plain',
+    _coreSoftwareFamily: row.software_family || null,
+    _coreSoftwareLevel: row.software_level == null ? null : Number(row.software_level),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+  if (row.item_type === 'software' && row.software_family && row.software_level != null && typeof software === 'object') {
+    const found = Object.entries(software).find(([, spec]) => spec && spec.family === row.software_family && Number(spec.level) === Number(row.software_level));
+    if (found) mapped.softwareId = found[0];
+  }
+  return mapped;
+}
+function netshiftCoreUpsertLocalFile(row) {
+  const mapped = netshiftCoreMapFile(row);
+  if (mapped._coreItemType === 'folder') return mapped;
+  state.localFiles = Array.isArray(state.localFiles) ? state.localFiles : [];
+  const index = state.localFiles.findIndex(file => file?._coreFileId === mapped._coreFileId);
+  if (index >= 0) state.localFiles[index] = mapped;
+  else state.localFiles.push(mapped);
+  state.localFileFolders = state.localFileFolders || {};
+  state.localFileFolders[mapped.name] = netshiftCoreFolderLocation(mapped._coreParentPath);
+  return mapped;
+}
+async function netshiftCoreLoadFiles({ quiet = false } = {}) {
+  if (!window.NETSHIFT_USER) return [];
+  try {
+    const [active, recycled] = await Promise.all([
+      netshiftApi('/api/core/files'),
+      netshiftApi('/api/core/files/recycle-bin')
+    ]);
+    NETSHIFT_CORE_FILES = Array.isArray(active.files) ? active.files : [];
+    NETSHIFT_CORE_RECYCLE_FILES = Array.isArray(recycled.files) ? recycled.files : [];
+
+    // Drop stale client mirrors and hydrate canonical server records.
+    state.localFiles = (Array.isArray(state.localFiles) ? state.localFiles : []).filter(file => !file?._coreFileId);
+    state.userFoldersV2 = (Array.isArray(state.userFoldersV2) ? state.userFoldersV2 : []).filter(folder => !folder?._coreFolderId);
+    state.recycleBin = (Array.isArray(state.recycleBin) ? state.recycleBin : []).filter(entry => !entry?._coreFileId);
+    for (const row of NETSHIFT_CORE_FILES) {
+      if (row.item_type === 'folder') {
+        if ((row.parent_path || '/') === '/') {
+          state.userFoldersV2.push({ name: row.name, createdAt: row.created_at, _coreFolderId: row.id, _coreFolderPath: '/' + row.name });
+        }
+      } else netshiftCoreUpsertLocalFile(row);
+    }
+    for (const row of NETSHIFT_CORE_RECYCLE_FILES) {
+      const mapped = netshiftCoreMapFile(row);
+      state.recycleBin.push({ type: row.item_type === 'software' ? 'file' : 'file', item: mapped, folder: netshiftCoreFolderLocation(row.parent_path || '/'), deletedAt: row.recycle_bin_at, _coreFileId: row.id });
+    }
+    refreshDesktopIcons();
+    refreshExplorerV11();
+    netshiftRenderUserFolders();
+    return NETSHIFT_CORE_FILES;
+  } catch (error) {
+    if (!quiet) console.warn('Could not synchronise server files:', error.message);
+    return [];
+  }
+}
+function netshiftCoreTakenName(name, parentPath = '/') {
+  return NETSHIFT_CORE_FILES.some(file => file.name.toLowerCase() === name.toLowerCase() && file.parent_path === parentPath && file.item_type !== 'folder') ||
+    state.localFiles.some(file => !file?._coreFileId && file.name.toLowerCase() === name.toLowerCase() && (state.localFileFolders?.[file.name] || (file.name === 'bank-info.txt' ? 'desktop' : 'downloads')) === netshiftCoreFolderLocation(parentPath));
+}
+function netshiftCoreUniqueUntitledName(parentPath = '/') {
+  let i = 1;
+  while (i < 10000) {
+    const name = i === 1 ? 'Untitled.txt' : `Untitled (${i}).txt`;
+    if (!netshiftCoreTakenName(name, parentPath)) return name;
+    i += 1;
+  }
+  throw new Error('Could not find an available Untitled filename.');
+}
+async function netshiftCoreCreateDesktopItem(type) {
+  if (type === 'folder') {
+    const base = 'New Folder';
+    let name = base, n = 2;
+    while (NETSHIFT_CORE_FILES.some(file => file.item_type === 'folder' && file.parent_path === '/' && file.name.toLowerCase() === name.toLowerCase()) || (state.userFoldersV2 || []).some(folder => folder.name.toLowerCase() === name.toLowerCase())) {
+      name = `${base} (${n++})`;
+    }
+    const result = await netshiftApi('/api/core/files', { method: 'POST', body: JSON.stringify({ name, type: 'folder', parentPath: '/', content: '' }) });
+    await netshiftCoreLoadFiles({ quiet: true });
+    localLog('Created persistent folder ' + name + '.');
+    toast('Folder created.');
+    return result.file;
+  }
+  if (type !== 'file') return;
+  const name = netshiftCoreUniqueUntitledName('/');
+  const result = await netshiftApi('/api/core/files', { method: 'POST', body: JSON.stringify({ name, type: 'file', parentPath: '/', content: '' }) });
+  await netshiftCoreLoadFiles({ quiet: true });
+  const file = state.localFiles.find(item => item._coreFileId === result.file.id) || netshiftCoreUpsertLocalFile(result.file);
+  localLog('Created persistent text file ' + name + '.');
+  netshiftOpenCoreNotepad(file);
+  return result.file;
+}
+function netshiftOpenCoreNotepad(file) {
+  const current = state.localFiles.find(item => item._coreFileId === file?._coreFileId) || file;
+  if (!current?._coreFileId) { toast('This file is not linked to the server yet.'); return; }
+  const windowId = 'core-notepad-' + current._coreFileId;
+  const safe = windowId.replace(/[^a-zA-Z0-9_-]/g, '-');
+  const contentId = safe + '-text';
+  const nameId = safe + '-name';
+  const statusId = safe + '-status';
+  const body = `<div style="background:#c0c0c0;color:#111;font:12px Tahoma,Verdana,sans-serif;padding:7px;border:2px inset #fff;min-height:260px;display:flex;flex-direction:column;gap:7px">
+    <div style="display:flex;align-items:center;gap:6px"><label for="${nameId}" style="white-space:nowrap">File name:</label><input id="${nameId}" type="text" maxlength="180" value="${esc(current.name)}" style="flex:1;min-width:0;padding:4px;border:2px inset #888;background:#fff;color:#111;font:12px Tahoma,Verdana,sans-serif"></div>
+    <textarea id="${contentId}" spellcheck="false" style="flex:1;min-height:230px;resize:vertical;border:2px inset #888;background:#fff;color:#111;padding:7px;font:13px 'Courier New',monospace">${esc(current.content || '')}</textarea>
+    <div style="display:flex;align-items:center;gap:8px"><button class="bevel" onclick="netshiftCoreSaveNotepad('${current._coreFileId}')">Save</button><button class="bevel" onclick="netshiftCoreReloadNotepad('${current._coreFileId}')">Reload from disk</button><span id="${statusId}" class="small" aria-live="polite">Ready</span></div>
+  </div>`;
+  openAppWindow(windowId, current.name + ' — Notepad', body);
+}
+async function netshiftCoreSaveNotepad(fileId) {
+  const file = state.localFiles.find(item => item._coreFileId === fileId);
+  const windowId = 'core-notepad-' + fileId;
+  const win = appWindows[windowId];
+  const root = win ? document.getElementById(win.rootId) : null;
+  const status = root?.querySelector('[id$="-status"]');
+  const nameInput = root?.querySelector('input[id$="-name"]');
+  const textInput = root?.querySelector('textarea[id$="-text"]');
+  if (!file || !nameInput || !textInput) { toast('Notepad window is no longer available.'); return; }
+  const name = nameInput.value.trim();
+  if (!name || name.length > 180 || /[\\/\0]/.test(name) || name === '.' || name === '..') { if (status) status.textContent = 'Invalid filename'; return; }
+  if (status) status.textContent = 'Saving…';
+  try {
+    const oldName = file.name;
+    const result = await netshiftApi('/api/core/files/' + encodeURIComponent(fileId), { method: 'PUT', body: JSON.stringify({ name, content: textInput.value, parentPath: file._coreParentPath || '/' }) });
+    if (state.localFileFolders) delete state.localFileFolders[oldName];
+    Object.assign(file, netshiftCoreMapFile(result.file));
+    if (state.localFileFolders) state.localFileFolders[name] = netshiftCoreFolderLocation(result.file.parent_path);
+    const title = root.querySelector('.app-titlebar span');
+    if (title) title.textContent = name + ' — Notepad';
+    if (win) win.title = name + ' — Notepad';
+    if (status) status.textContent = 'Saved to NETSHIFT disk';
+    await netshiftCoreLoadFiles({ quiet: true });
+    toast('File saved.');
+  } catch (error) {
+    if (status) status.textContent = 'Save failed: ' + error.message;
+    if (error.status === 409) toast('That filename is already in use in this folder. Choose another name.');
+    else toast('Could not save file: ' + error.message);
+  }
+}
+async function netshiftCoreReloadNotepad(fileId) {
+  await netshiftCoreLoadFiles({ quiet: true });
+  const file = state.localFiles.find(item => item._coreFileId === fileId);
+  if (!file) { toast('This file could not be found on the server.'); return; }
+  netshiftOpenCoreNotepad(file);
+}
+function netshiftCoreFindLocalFile(key) {
+  return state.localFiles.find(item => item._coreFileId === key || item.name === key);
+}
+// Replace legacy open behaviour only for files that have a canonical server ID.
+var netshiftLegacyOpenLocalFileV11 = openLocalFileV11;
+openLocalFileV11 = function(file) {
+  if (file?._coreFileId && file._coreItemType === 'file') { netshiftOpenCoreNotepad(file); return; }
+  return netshiftLegacyOpenLocalFileV11(file);
+};
+var netshiftLegacyRenderUserFolders = netshiftRenderUserFolders;
+netshiftRenderUserFolders = function() {
+  const strip = document.getElementById('desktopIcons');
+  if (!strip) return;
+  strip.querySelectorAll('[data-user-folder-v2]').forEach(node => node.remove());
+  (state.userFoldersV2 || []).forEach(folder => {
+    const el = document.createElement('div'); el.className = 'deskicon'; el.dataset.userFolderV2 = folder.name;
+    el.innerHTML = '<span>📁</span>' + esc(folder.name); el.title = 'User folder';
+    el.ondblclick = () => openExplorerWindow(folder._coreFolderPath ? 'custom:' + folder.name : 'desktop');
+    el.oncontextmenu = event => { event.preventDefault(); showContextMenu(event, 'userFolder', '', folder.name); };
+    strip.appendChild(el);
+  });
+};
+var netshiftLegacyOpenExplorerWindow = openExplorerWindow;
+openExplorerWindow = function(folder = 'desktop') {
+  state.explorerFolderV16 = folder;
+  const windowRef = netshiftLegacyOpenExplorerWindow(folder);
+  const id = 'explorer-' + state.explorerSerialV16;
+  if (windowRef) {
+    windowRef.folder = folder;
+    state.activeExplorerWindowV16 = id;
+    state.explorerFolderV16 = folder;
+    const body = document.getElementById(windowRef.bodyId);
+    if (body) body.innerHTML = renderExplorerContent();
+  }
+  return windowRef;
+};
+var netshiftLegacyRenderExplorerContent = renderExplorerContent;
+renderExplorerContent = function() {
+  const win = appWindows[state.activeExplorerWindowV16];
+  const folder = win?.folder || state.explorerFolderV16 || 'desktop';
+  if (!folder.startsWith('custom:')) return netshiftLegacyRenderExplorerContent();
+  const folderName = folder.slice('custom:'.length);
+  const folderPath = '/' + folderName;
+  const files = state.localFiles.filter(file => file._coreFileId && file._coreParentPath === folderPath).map(renderLocalFileRowV16).join('');
+  const subfolders = (state.userFoldersV2 || []).filter(item => item._coreFolderPath?.startsWith(folderPath + '/') ).map(item => `<div class="explorer-row"><div class="fileicon">📁</div><div class="fileinfo"><strong>${esc(item.name)}</strong><small>Folder</small></div></div>`).join('');
+  return `<div class="box"><h3>Windows Explorer — ${esc(folderName)}</h3><p class="small muted">This folder is server-backed. Right-click files to open, edit or move them to the Recycle Bin.</p><div class="file-drop-target-v16" ondragover="event.preventDefault()" ondrop="event.preventDefault();dropOnFolderV16(event,'custom:${esc(folderName)}')">Drop items here to move into ${esc(folderName)}</div><div class="file-list">${files || subfolders || '<p>This folder is empty.</p>'}</div></div>`;
+};
+var netshiftLegacyDropOnFolderV16 = dropOnFolderV16;
+dropOnFolderV16 = function(event, folder) {
+  const payload = state.dragPayloadV16;
+  if (payload?.type === 'localFile') {
+    const file = state.localFiles.find(item => item.name === payload.name);
+    if (file?._coreFileId) {
+      event.preventDefault();
+      (async () => {
+        try {
+          if (folder === 'recycle') {
+            await netshiftApi('/api/core/files/' + encodeURIComponent(file._coreFileId), { method: 'DELETE' });
+          } else {
+            const parentPath = folder === 'desktop' ? '/' : folder === 'downloads' ? '/downloads' : folder === 'archive' ? '/archive' : folder.startsWith('custom:') ? '/' + folder.slice(7) : null;
+            if (!parentPath) throw new Error('Unknown destination folder.');
+            await netshiftApi('/api/core/files/' + encodeURIComponent(file._coreFileId), { method: 'PUT', body: JSON.stringify({ content: file.content || '', name: file.name, parentPath }) });
+          }
+          state.dragPayloadV16 = null;
+          await netshiftCoreLoadFiles({ quiet: true });
+          toast(folder === 'recycle' ? 'Moved to Recycle Bin.' : 'File moved to ' + folder + '.');
+        } catch (error) { toast('Move failed: ' + error.message); }
+      })();
+      return;
+    }
+  }
+  return netshiftLegacyDropOnFolderV16(event, folder);
+};
+var netshiftLegacyContextAction = contextAction;
+contextAction = function(action, type, site, key) {
+  if (type === 'localFile') {
+    const file = state.localFiles.find(item => item.name === key);
+    if (file?._coreFileId && action === 'delete') {
+      $('contextMenu')?.classList.add('hidden');
+      netshiftApi('/api/core/files/' + encodeURIComponent(file._coreFileId), { method: 'DELETE' })
+        .then(async () => { await netshiftCoreLoadFiles({ quiet: true }); toast('Moved to Recycle Bin.'); })
+        .catch(error => toast('Delete failed: ' + error.message));
+      return;
+    }
+    if (file?._coreFileId && action === 'open') { $('contextMenu')?.classList.add('hidden'); netshiftOpenCoreNotepad(file); return; }
+  }
+  return netshiftLegacyContextAction(action, type, site, key);
+};
+var netshiftLegacyRestoreRecycleV16 = restoreRecycleV16;
+restoreRecycleV16 = function(index) {
+  const entry = state.recycleBin[index];
+  if (entry?._coreFileId) {
+    netshiftApi('/api/core/files/' + encodeURIComponent(entry._coreFileId) + '/restore', { method: 'POST', body: '{}' })
+      .then(async () => { await netshiftCoreLoadFiles({ quiet: true }); toast('File restored.'); })
+      .catch(error => toast('Restore failed: ' + error.message));
+    return;
+  }
+  return netshiftLegacyRestoreRecycleV16(index);
+};
+var netshiftLegacyPermanentlyDeleteRecycleV16 = permanentlyDeleteRecycleV16;
+permanentlyDeleteRecycleV16 = function(index) {
+  const entry = state.recycleBin[index];
+  if (entry?._coreFileId) {
+    netshiftApi('/api/core/files/' + encodeURIComponent(entry._coreFileId) + '/permanent', { method: 'DELETE' })
+      .then(async () => { await netshiftCoreLoadFiles({ quiet: true }); toast('File permanently deleted.'); })
+      .catch(error => toast('Permanent delete failed: ' + error.message));
+    return;
+  }
+  return netshiftLegacyPermanentlyDeleteRecycleV16(index);
+};
+// A force-connect attempt is possible only after a password-verified login found that
+// the incumbent has no reachable live socket. The server re-checks this before takeover.
+async function netshiftForceConnect() {
+  const button = $('forceConnectButton');
+  if (!button || button.disabled) return;
+  const accepted = await new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:#0008;z-index:100010;display:flex;align-items:center;justify-content:center;padding:16px';
+    overlay.innerHTML = `<div role="alertdialog" aria-modal="true" style="width:min(440px,96vw);background:#c0c0c0;border:3px outset #fff;box-shadow:4px 4px #0007;font:13px Tahoma,Verdana,sans-serif;color:#111"><div style="background:navy;color:#fff;font-weight:bold;padding:5px 8px">NETSHIFT — Force Connect</div><div style="padding:16px"><p>The previous session could not be reached. Force Connect will take over account control and revoke the previous session if it is still unreachable. Any unsaved progress in that session may be lost.</p><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px"><button class="bevel" id="forceConnectCancel">Cancel</button><button class="bevel" id="forceConnectConfirm">Force Connect</button></div></div></div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#forceConnectCancel').onclick = () => { overlay.remove(); resolve(false); };
+    overlay.querySelector('#forceConnectConfirm').onclick = () => { overlay.remove(); resolve(true); };
+  });
+  if (!accepted) return;
+  button.disabled = true;
+  netshiftSetAuthMessage('Rechecking the previous session and requesting control…');
+  try {
+    const result = await netshiftApi('/api/auth/force-connect', { method: 'POST', body: '{}' });
+    button.hidden = true;
+    await netshiftAfterAuth(result.user);
+    toast('Force Connect succeeded.');
+  } catch (error) {
+    netshiftSetAuthMessage(error.message, 'error');
+    button.hidden = error.code !== 'ACTIVE_SESSION_UNREACHABLE';
+  } finally { button.disabled = false; }
 }
 
 </script></body></html>

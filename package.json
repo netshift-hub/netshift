@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "check": "node --check server.js && node scripts/check-client.js && node scripts/check-multiplayer-markers.js && node scripts/check-session-chat.js && node scripts/check-world-compromise.js && node scripts/check-core-v2.js && node scripts/check-game-identities.js",
+    "check": "node --check server.js && node scripts/check-client.js && node scripts/check-multiplayer-markers.js && node scripts/check-session-chat.js && node scripts/check-world-compromise.js && node scripts/check-core-v2.js && node scripts/check-game-identities.js && node scripts/check-core-files-ui.js",
     "admin:grant": "node scripts/grant-admin.js"
   },
   "engines": {

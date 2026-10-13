@@ -50,12 +50,14 @@ Develop and test only on `dev-multiplayer-v2` + `netshift-staging` + the staging
 - The only current intended income path is money recovered from stolen **NPC bank credentials**. Model NPC credentials and their loot independently from player First Bank accounts.
 - Software/workstation inventory regenerates five minutes after the last successful intrusion; recovered NPC bank loot values replenish 30 minutes after the last theft from that NPC account. Preserve the stated three-in-game-day host lockout when credential loot triggers it. Define how the five-minute stock timer interacts with credential-bearing inventory explicitly in the service and tests rather than duplicating timers across the client.
 - Add the Hall of Fame under Network with explicit opt-in. The player chooses a public pseudonym, is warned not to use their login username, and the server derives the submitted money/score from authoritative records. Reject case-insensitive matches with their login username, sanitise/rate-limit public names, prevent duplicate submissions and show only pseudonym/score/rank publicly. Internally link submissions to accounts only for abuse prevention; do not label this as absolute anonymity.
+- Add a Router Admin IP-change purchase. Charge a configurable, deliberately hefty fee through the authoritative transaction ledger, issue a new unique fictional IPv4 address, and persist the change and timestamp. Do not let the client choose an arbitrary address or change identity for free. Keep exact fee/balance rules configurable for future tuning.
 
 **Gate:** balance cannot be altered via DevTools or `/api/save`; no negative/duplicated money under concurrent actions; NPC loot cannot expose/modify any player's actual First Bank account.
 
 ## Phase 5 — Shared PC records and PvP resolution
 
 - Maintain a shared server-side access/admin log per workstation. Every player sees the same target log unless it has been deleted under game rules; two players accessing the PC close together must see both visits in the correct order.
+- Implement IP changes as a logged Router Admin action. An IP change must update the player's canonical identity without wiping active infection/trace relationships; a virus that is still installed and linked to a hacker must be able to report or follow the victim's new IP, even when the router log records the change. Removing the virus first should break that tracking path.
 - Add attack validation for SafetyShield, attacker Waterwall, target Firewall, active session ownership, target access and post-success immunity. Firewall/Waterwall are never deletable in PvP; other loot/deletion rules are server-defined.
 - Successful player hack grants 30 minutes of hack immunity to the victim; server timestamps, not client clocks, decide.
 - Implement gifting/trading as an authorised inventory mutation and use equipped/gifted Firewall as actual defence.
@@ -64,17 +66,33 @@ Develop and test only on `dev-multiplayer-v2` + `netshift-staging` + the staging
 
 **Gate:** two-browser tests for simultaneous attacks, cooldowns, shield ON/OFF, insufficient Waterwall, protected software, ownership transfer and shared logs.
 
-## Phase 6 — NPC scheduling, behaviour and malware presentation
+## Phase 6 — Email service, account recovery and spamware (next major feature)
+
+Build email on the server-side identity, file and malware foundations, not as another local browser inbox.
+
+- Provide an era-appropriate email UI with server-owned messages, folders, read/unread state and attachment metadata. A mailbox can contain at most 1,000 messages. Block/score spam before mailbox insertion so the cap and Spammer Jammer matter.
+- Support player-to-player messaging. Give mail identities to players, NPCs and WHOIS sites. Start with `@chainmail.net` and `@badlook.com`; keep domains data-driven so more can be added. Site identities correspond to their website. Generate NPC local parts from word dictionaries plus numbers; ensure addresses are unique and stable.
+- Make `netshift_email_accounts`, `netshift_emails`, recipient delivery, attachment records and spam-delivery events server-authoritative. Enforce per-mailbox limits and anti-abuse/rate limits transactionally. The browser must not be able to forge sender identity, attachments, inbox count or malware level.
+- Implement Spammer and Spammer Jammer software levels 1–5. Spammer L1 targets 5 messages/hour; L5 targets 25/hour, with levels scaling between. Spammer Commander has no level and extends/commands spam activity according to a documented behaviour contract before its code is written. Spammer Jammer blocks 80% of same-level spam, more from weaker spammers and less from stronger ones. Keep the percentage curve configurable and testable; spam should remain possible, never universally zeroed.
+- Uploading/infecting a workstation with Spammer or Spammer Commander can hijack that player's email identity to send spam. Spammer Jammer is an anti-spam countermeasure. Infection state, sender attribution and the messages actually sent must be server-owned; UI notifications are presentation only.
+- Add Karmic Emails from players and NPCs, delivered on a configured random schedule. Attachments may be helpful software from a friendly hacker or taunting/malicious payloads. The visible filename may deliberately misrepresent the payload (for example, a fake utility name), so the server stores the real asset/type/family/level/signature separately and execution checks the real metadata, not the filename or extension. Tracking and opening the attachment must create auditable inventory/infection events.
+- Account recovery: support nullable email identity on existing/new player accounts, verification before it can be used for recovery, expiring single-use password-reset tokens stored only as hashes, rate limiting and audit events. Accounts and First Bank accounts may exist before a mail identity is created; bank credentials are never used as the platform password-reset credential. Add an external/independent recovery factor or a documented manual recovery route for accounts that have no verified address, because a fictional in-game mailbox by itself cannot be accessed while the player is locked out.
+- The local schema groundwork now includes nullable `email_address` / `email_verified_at` user fields and a password-reset token table. Email delivery/UI, email identities, inbox tables, virus integration and working resets are **not implemented yet**; add them in the email phase with explicit migrations and tests.
+
+**Gate:** player mail round-trip; stable site/NPC addresses; mailbox capacity; rate limiting; 1,000-message boundary; spam rates; jammer curve; infected sender attribution; valid/invalid attachment handling; recovery-token expiry/reuse rejection; and recovery behaviour for accounts that existed before they had email.
+
+## Phase 7 — NPC scheduling, behaviour and malware presentation
 
 - Give each player 30 minutes of server-recorded active play time before NPC attack timers begin; do not count mere wall-clock time offline.
 - Run the 15–60 minute NPC attack scheduler on the server. NPC identities/IPs are stable; attacks use real NPC Waterwall/target Firewall values and persist outcomes.
 - NPCs evaluate a target's server-side inventory and prefer valuable/high-level files/software when their behaviour permits it. Stolen items become visible on the attacker's NPC workstation/download records so a player who tracks and hacks that machine can recover eligible loot. NPC taunts can describe the actual theft/infection without claiming actions that did not occur.
 - Record intrusion details in the target's shared Router admin log. Use staged IP obfuscation, clues, taunts or plausible mistakes that can let an attentive player identify the attacker; expire/remove the trace 30 minutes after the intrusion, not immediately. Don't make obfuscation purely random if it is meant to be solvable.
 - Make popup spam larger and more frequent, with varied late-1990s/early-Web-style advertisements and messages. After a randomly selected 2–10 user closes, pause popups for 3 seconds so antivirus can be selected/launched. The infection/attack source stays server-owned; the UI effects remain client presentation.
+- Active tracking viruses retain a server-side association between the compromised workstation and the attacker. Changing a virtual IP must update what an active tracking virus observes; deleting/quarantining that virus through valid gameplay action breaks the association. Do not rely on a client-side flag to decide whether tracking continues.
 
 **Gate:** simulate scheduler deterministically in tests, prove no attacks before 30 active minutes, verify item theft/log clue/restoration, and test popup close counts/pause/antivirus interaction.
 
-## Phase 7 — Website catalogue and exploration
+## Phase 8 — Website catalogue and exploration
 
 - Replace the growing hard-coded website list with a data-driven site registry plus reusable page templates and per-site content/components.
 - Add richer variation in themes, layout, services, security level, rewards, items and behaviour, retaining distinct identities and stable addresses.
@@ -84,7 +102,7 @@ Develop and test only on `dev-multiplayer-v2` + `netshift-staging` + the staging
 
 **Gate:** stable IPs after refresh, unique addresses, five-minute listing refresh, diverse page-template tests, predictable discoverability and no client-trusted security/reward decisions.
 
-## Phase 8 — Administrator MFA and hardened moderation
+## Phase 9 — Administrator MFA and hardened moderation
 
 - Use TOTP compatible with Google Authenticator. Provide an authenticated enrollment screen and QR/secret setup, require proof of a current code, then require verified MFA for every admin route/session. Encrypt TOTP secrets at rest using a separately managed deployment secret; never commit keys. Hash one-time recovery codes and invalidate each on use.
 - Don't provision operational admin roles until enrollment/verification tests pass. Keep operator-controlled role grants outside public APIs.
@@ -93,7 +111,7 @@ Develop and test only on `dev-multiplayer-v2` + `netshift-staging` + the staging
 
 **Gate:** ordinary player gets 403; admin without MFA gets 401/403 on every route; valid TOTP permits access; replay/invalid codes rejected; kick/ban disconnects and denies subsequent requests; recovery-code handling and audit trail validated.
 
-## Phase 9 — Release certification and future extensibility
+## Phase 10 — Release certification and future extensibility
 
 - Add API integration tests against a disposable PostgreSQL database and two-account browser tests on Render/Neon staging.
 - Run static syntax checks, migrations from both a fresh database and an existing v1.3/v2 preview database, race tests for claims/transfers/attacks and reload/restart persistence checks.
@@ -102,6 +120,14 @@ Develop and test only on `dev-multiplayer-v2` + `netshift-staging` + the staging
 - Promote to production only after all explicit release gates pass; health endpoint success alone is insufficient.
 
 ## Agreed product requirements captured
+
+- Authentication: after password verification, if the incumbent account session cannot be reached, offer a clearly warned Windows-style **Force Connect** action. The server must re-check the incumbent is still unreachable at takeover time, revoke the old session, and refuse Force Connect if the incumbent reconnects; ordinary reachable sessions retain the existing Yes/No handoff flow.
+- My Computer must display the bank account number as `NONE` until the player registers with First Bank, even if a random account number is already reserved server-side. Creating and closing/recreating player bank accounts is a later banking feature; use a closed-account/active-account model and preserve the ledger rather than hard-deleting financial history.
+- Email recovery: existing player and bank accounts can predate in-game email. Keep bank credentials independent from NETSHIFT account credentials. A mailbox-only recovery is circular if the mailbox itself requires the forgotten password, so support a verified external recovery channel or a separately issued recovery factor for accounts without one.
+- Email: the next major feature after current file/state and economy foundations. Initial domains are `chainmail.net` and `badlook.com`, with a data-driven allowlist for later domains. Give players, NPCs and WHOIS sites stable identities; generate NPC aliases from a dictionary plus digits. Use an era-appropriate interface and server-authoritative inboxes, recipients and attachments; enforce a 1,000-message mailbox cap.
+- Email malware: Spammer levels 1–5 send 5–25 messages per hour (linear level scaling); Spammer Commander has no level; Spammer Jammer blocks 80% of equal-level spam and increasingly less from stronger, increasingly more from weaker, spammers. Spam remains possible. Infections can hijack a workstation's mail identity to send messages.
+- Karmic Emails: player/NPC messages may carry helpful software or deceptive/taunting malicious attachments. The displayed filename can disguise the real payload; server-side asset metadata, not filename/extension, decides what executes.
+- Additional future bank account lifecycle: players will eventually be able to create and close accounts, but not in this slice. Preserve transaction history, allow a player to open a new account after closure, and avoid the current one-account lifetime unique constraint in that later migration.
 
 - Player virtual IPs have an IPv4 appearance with 2-/3-digit octets; bank account numbers look realistic and random rather than sequential.
 - SafetyShield ON is green; OFF is red and has a foreground cross over the shield.
@@ -116,3 +142,14 @@ Develop and test only on `dev-multiplayer-v2` + `netshift-staging` + the staging
 - Admin MFA uses Google Authenticator-compatible TOTP.
 - Network gets a consent-based Hall of Fame with a chosen public pseudonym and a warning not to reuse the account login username.
 - Future software, minigames and player/NPC interactions should be easy to extend through services and site/PC capability registries.
+- Router Admin IP-change purchase: high configurable fee, newly generated unique virtual IP, a persistent change record, and virus-aware tracking. Verify the changed IP is stable after reload and that an active tracker still follows it until the virus is removed.
+
+## Latest implementation slice — files, Force Connect and email-recovery groundwork
+
+- The server-owned file API now supports a recycle-bin timestamp, recycle-bin listing, restore, permanent deletion, and editing filename/content/location in a single owner-scoped API operation. Active filenames are unique within a player/path while files in the Recycle Bin no longer reserve the name. This is an additive migration but still needs testing on staging.
+- Right-click New Text Document no longer uses browser `prompt()` dialogs. It creates a server-backed `Untitled.txt` (or incremented `Untitled (2).txt`, etc.) and opens an in-game Windows 98-style Notepad with editable filename and body text. The UI loads canonical file records after account login and excludes server-linked file data from the legacy client save payload. Full reconciliation of every old local inventory handler remains outstanding.
+- Core file records are rendered in desktop/Explorer views and Recycle Bin operations call the owner-scoped APIs. Rename, edit, move, restore and permanent-delete flows have static/syntax checks only; verify them interactively on staging.
+- Added a password-verified Force Connect flow for an unreachable incumbent session. The endpoint rechecks reachability at the point of takeover and refuses a takeover if the old session is reachable; a Windows-style confirmation warns that unsaved progress can be lost. This is security-sensitive and must be tested with two browser profiles before relying on it.
+- My Computer now shows `NONE` and no bank balance until First Bank credentials are set up, even though the server may already have reserved the random account number.
+- Added nullable user email/verification fields and hashed, expiring, single-use password-reset token schema groundwork. No email delivery, mailbox or password-reset route/UI is implemented yet.
+- `npm run check` passes locally, including added static checks for the new file UI/API and Force Connect markers. No live Neon/Render database migration or browser integration run has been performed for this slice.

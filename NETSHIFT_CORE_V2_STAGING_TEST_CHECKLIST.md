@@ -49,7 +49,7 @@ Use two disposable NETSHIFT player accounts, A and B. Open First Bank (`firstban
 - [ ] An account that has not created bank credentials is prompted to choose a separate bank username and password.
 - [ ] Account setup succeeds and authenticates the player's First Bank session.
 - [ ] The bank overview shows that player's unique account number and the server-loaded $500 opening balance.
-- [ ] My Computer shows the same account number and balance as the profile API, not the old fixed `100001` demo value. Verify the account number is random-looking (eight digits), stable on subsequent loads, and not generated sequentially from user ID.
+- [ ] Once First Bank is set up, My Computer shows the same account number and balance as the profile API, not the old fixed `100001` demo value. Before setup, My Computer shows account number `NONE` and does not show an unregistered balance. Verify the account number is random-looking (eight digits), stable on subsequent loads, and not generated sequentially from user ID.
 - [ ] Reload the game. `/api/core/profile` reports the same account number; `bankSetup` remains true.
 - [ ] After signing out of First Bank, the page asks for bank credentials again. Correct credentials work; an incorrect password is rejected.
 - [x] Player A and B have different account numbers; using an already-taken bank username on the other account was rejected (reported passing on 2026-10-13).
@@ -162,3 +162,44 @@ Review the entire codebase, not only the current Core v2 endpoints, and inventor
 - [ ] Google Authenticator-compatible TOTP, recovery codes and enforced MFA for every admin route before any admin role is used operationally.
 - [ ] Network → Hall of Fame: explicit opt-in, pseudonym, warning not to reuse login username, server-derived score, rate limiting and public/private data separation.
 - [ ] Use `NETSHIFT_V2_IMPLEMENTATION_PLAN.md` and `NETSHIFT_STATE_OWNERSHIP_AUDIT.md` as the implementation order and source-of-truth inventory.
+
+
+## H6. Authentication response discrepancy and future Router IP-change feature
+
+- [ ] Investigate reported incognito result: `/api/core/profile` returns HTTP 200 in the authenticated regular browser session but HTTP 404 in Incognito. In the currently documented server implementation, `requireAuth` returns HTTP 401 with `AUTH_REQUIRED` for an unauthenticated session, so capture the Incognito request URL, status, content type and response body before treating 404 as expected. Confirm Incognito is on the exact `https://netshift-staging.onrender.com/` origin and that the deployed branch matches the source.
+- [ ] Future feature: purchase an IP change in Router Admin for a configurable hefty fee using the server-authoritative ledger; assign a unique new virtual IP, persist the change record and preserve stability after refresh/relogin.
+- [ ] Verify an active tracking virus still resolves/follows the victim's changed IP and records the change; after valid removal of the virus, the attacker must no longer receive updated-IP tracking. Test with two accounts and ensure the browser cannot submit arbitrary IPs or bypass payment.
+
+
+## I. Latest local implementation slice — test only after deploying to staging
+
+### I1. Force Connect (two browser profiles required)
+
+- [ ] With an incumbent session actively connected, log in with correct credentials from a second browser: normal Yes/No handoff must be used; Force Connect must not be offered.
+- [ ] Simulate an incumbent session that has no reachable Socket.IO connection but is still recorded as account owner. Correct credentials should show the Force Connect button after the login response.
+- [ ] Cancel the Windows-style confirmation: no takeover occurs.
+- [ ] Confirm Force Connect: request succeeds only while the incumbent still has no connected socket; ownership moves to the new session and old session requests fail ownership checks.
+- [ ] Race test: if the incumbent reconnects between button display and confirmation, the server returns `ACTIVE_SESSION_REACHABLE` and refuses the takeover.
+- [ ] Reload on the pending Force Connect browser and verify the explicit button remains available; reload of the old session must not silently release ownership.
+
+### I2. Server-backed desktop files and Notepad
+
+- [ ] Right-click blank desktop → New Text Document creates `Untitled.txt` server-side and opens the in-game Notepad. No browser-native prompt or Chrome dialog appears.
+- [ ] Create a second text document; default name increments (for example, `Untitled (2).txt`).
+- [ ] Edit file text and filename in Notepad; Save persists changes in `GET /api/core/files`. Close/reopen and refresh the browser: the current filename/content remain.
+- [ ] Create a folder and confirm it appears after relogin. Open it and verify files moved into it persist.
+- [ ] Move a server-backed file to Recycle Bin, restore it, then permanently delete a separate disposable file. Recycled filenames may be reused.
+- [ ] Account B cannot list/read/edit/restore/delete Account A's file records. Cross-account mutation returns HTTP 404.
+- [ ] Confirm server-backed file contents and IDs are not mirrored into the legacy `/api/save` document.
+
+### I3. Password-reset schema and mail feature boundary
+
+- [ ] Verify startup migration adds `email_address`, `email_verified_at`, `netshift_password_reset_tokens`, and `recycle_bin_at` without dropping player data.
+- [ ] No claim of password reset/email delivery should be made until verification, delivery, token consumption and lockout/rate-limiting routes are implemented.
+- [ ] Later email acceptance tests must cover the 1,000-message cap, player/site/NPC addresses, levelled spam/jammer rates, Commander infection, and deceptive attachment payload metadata.
+
+## J. Deferred product requirements
+
+- Future player bank-account create/close/reopen lifecycle. A closed account must preserve the transaction ledger; schema currently allows only one player bank account per user and will need an explicit migration to change that rule.
+- Email will be the next major feature after the file/state/economy foundations: initial `chainmail.net` and `badlook.com` domains, extensible domain registry, player/site/NPC email addresses, era-appropriate mail UI, player-to-player email, 1,000-message mailbox limit, Spammer L1–L5 (5–25 emails/hour), unlevelled Spammer Commander, Spammer Jammer (80% same-level block baseline), spam infection, and Karmic Emails with actual server-side attachment identity separate from deceptive filenames.
+- Accounts created before they have an email address must have a documented alternate recovery path; an inaccessible in-game mailbox cannot alone reset a forgotten login password.
