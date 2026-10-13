@@ -1,0 +1,27 @@
+NETSHIFT Stage 1 — Chunk 3 test log
+Repository baseline: netshift-hub/netshift staging @ 06c28e60f348e1b2b1891d00db597180afd4eae0
+Worktree: /mnt/data/netshift-staging-tested
+Database access: none. No staging or production database reset/execution occurred.
+
+Final commands and results:
+- node --check server.js: PASS
+- node --check lib/legacy-save-cutover.js: PASS
+- node --check scripts/check-stage1-save-cutover.js: PASS
+- node --check scripts/check-multiplayer-markers.js: PASS
+- node scripts/check-stage1-migration-contract.js: PASS (12 synthetic contract cases)
+- node scripts/check-stage1-save-cutover.js: PASS (first-run legacy reset scope; schema-v2 save preservation; canonical server-record preservation; idempotent retry; synthetic receipt-insert failure rolls back; eight concurrent startup attempts apply only once; retired-schema recognition; server startup/read/write wiring)
+- npm run check: PASS (server/client syntax, multiplayer markers, session/chat, world compromise, core v2, game identities, core files UI, contract fixtures and save cutover tests)
+
+Implementation summary:
+- Added `netshift_migration_receipts` schema and `lib/legacy-save-cutover.js`.
+- Startup awaits the transaction before creating/listening on the HTTP server. The transaction obtains a PostgreSQL advisory xact lock, checks a receipt, deletes rows whose JSON `schemaVersion` is not the current version 2, and inserts the receipt before committing. Existing schema-v2 save rows are preserved.
+- GET `/api/save` suppresses legacy/unknown versions. POST `/api/save` returns HTTP 400 `LEGACY_SAVE_RETIRED` for schema-v1 payloads, regardless of `baseRevision`; any other writes currently return HTTP 503 `SAVE_PROTOCOL_NOT_READY` until Chunk 4 implements the safe schema-v2 protocol.
+- `check-multiplayer-markers.js` now expects the explicit fail-closed marker during this temporary save-disabled stage and expects `currentRevision` when the save protocol is enabled again.
+
+Limitations:
+- Cutover tests use a purpose-built in-memory SQL adapter. This tests the helper's code path and lock/retry model, not actual PostgreSQL SQL semantics, advisory locking, transaction isolation or schema compatibility.
+- Do not deploy this intermediate build: the active frontend still posts schema-v1 saves, and all save writes are intentionally rejected until Chunk 4.
+- On first startup against the intended database, the helper will delete legacy/unknown rows from `netshift_saves` once. It does not issue DELETE statements against users, profile, bank, canonical files/software, world, host stock/claims or admin tables.
+- Old application instances must be drained during cutover so an older version cannot recreate a schema-v1 row after the migration receipt is committed.
+
+No GitHub writes, commits, pushes, deployments, or live database operations were performed.

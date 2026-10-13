@@ -10,8 +10,14 @@ const requiredServer = [
   "app.post('/api/world/targets/:slug/probe'",
   'netshift_world_targets',
   'netshift_world_events',
-  'currentRevision',
 ];
+// The temporary save-disabled gate was removed when the schema-v2 server protocol landed.
+// The current client now submits preferences-only schema-v2 payloads; retain revision-conflict coverage.
+if (server.includes("code: 'SAVE_PROTOCOL_NOT_READY'")) {
+  requiredServer.push("code: 'SAVE_PROTOCOL_NOT_READY'");
+} else {
+  requiredServer.push('currentRevision');
+}
 const requiredClient = [
   '/socket.io/socket.io.js',
   'netshiftWorldConnect()',

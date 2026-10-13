@@ -1,0 +1,29 @@
+NETSHIFT Stage 1 — Chunk 5 test log
+Source reference: netshift-hub/netshift staging @ 06c28e60f348e1b2b1891d00db597180afd4eae0
+Working copy: /mnt/data/netshift-stage1-work
+Scope: frontend save protocol cutover only
+Database access: none; no GitHub operations or deployment.
+
+Checks run after the final code/doc updates:
+- node scripts/check-client.js: PASS (Client JavaScript syntax OK)
+- node scripts/check-stage1-client-save-protocol.js: PASS (schema-v2 preference payload, address validation, revision handling, restore rejection of schema-v1/extra fields, save-readiness, conflict/page-hide wiring)
+- node scripts/check-core-files-ui.js: PASS (server-backed Notepad, recycle bin, preference-only snapshot and Force Connect markers)
+- npm run check: PASS
+  - node --check server.js
+  - node scripts/check-client.js
+  - node scripts/check-multiplayer-markers.js
+  - node scripts/check-session-chat.js
+  - node scripts/check-world-compromise.js
+  - node scripts/check-core-v2.js
+  - node scripts/check-game-identities.js
+  - node scripts/check-core-files-ui.js
+  - node scripts/check-stage1-migration-contract.js
+  - node scripts/check-stage1-save-protocol.js
+  - node scripts/check-stage1-client-save-protocol.js
+  - node scripts/check-stage1-save-cutover.js
+
+Limitations:
+- The checks are static/unit/helper tests; they do not prove browser runtime behaviour or real PostgreSQL transaction/locking semantics.
+- No staging or production database was connected, reset or migrated.
+- No two-account browser test, GitHub write/push or deployment was performed.
+- Stage 1 remains incomplete. Chunk 6 is profile and canonical-inventory hydration gating; canonical inventory reconciliation and atomic host-download correction remain later work.

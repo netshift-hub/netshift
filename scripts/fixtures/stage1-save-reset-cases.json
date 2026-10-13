@@ -1,0 +1,92 @@
+{
+  "contractVersion": 1,
+  "sourceCommit": "06c28e60f348e1b2b1891d00db597180afd4eae0",
+  "policy": {
+    "legacySaveSchemaVersion": 1,
+    "legacySaveAction": "discard",
+    "legacyBrowserInventoryAction": "reset-to-defaults",
+    "canonicalServerRecordsAction": "preserve",
+    "migrateLegacyPurchases": false,
+    "createPurchaseLedgerRows": false,
+    "deletePlayerAccounts": false,
+    "deleteCanonicalPlayerFiles": false
+  },
+  "cases": [
+    {
+      "id": "empty-legacy-v1-save",
+      "description": "A version-1 save with empty inventory is ignored and replaced by current defaults.",
+      "legacySave": { "schemaVersion": 1, "state": { "owned": [], "archiveSoftware": [], "localFiles": [], "userFoldersV2": [], "localFileFolders": {}, "recycleBin": [] } },
+      "expected": { "legacySave": "discard", "defaultState": "load", "createdCanonicalRows": 0, "purchaseRowsCreated": 0, "canonicalRowsDeleted": 0 }
+    },
+    {
+      "id": "legacy-owned-software-does-not-create-ownership",
+      "description": "Legacy state.owned is not imported, even if it contains a plausible software ID.",
+      "legacySave": { "schemaVersion": 1, "state": { "owned": ["crc2"], "archiveSoftware": [{ "id": "waterwall3", "archivedAt": 1710000000000 }] } },
+      "expected": { "legacySave": "discard", "softwareRowsCreated": 0, "purchaseRowsCreated": 0, "canonicalRowsDeleted": 0 }
+    },
+    {
+      "id": "legacy-balance-and-purchase-claims-ignored",
+      "description": "A browser save cannot mint money, purchases, rewards or upgrades.",
+      "legacySave": { "schemaVersion": 1, "state": { "accounts": { "player": { "balance": 999999999 } }, "owned": ["premium-firewall-6"], "upgrades": [{ "id": "cpu-5", "paid": true }] } },
+      "expected": { "legacySave": "discard", "ledgerRowsCreated": 0, "bankRowsChanged": 0, "purchaseRowsCreated": 0 }
+    },
+    {
+      "id": "legacy-demo-bank-info-credentials",
+      "description": "Demo credentials embedded in an old local text file are not copied into bank tables or canonical files.",
+      "legacySave": { "schemaVersion": 1, "state": { "localFiles": [{ "name": "bank-info.txt", "kind": "text", "content": "[synthetic demo credentials omitted]" }] } },
+      "expected": { "legacySave": "discard", "bankRowsChanged": 0, "canonicalRowsCreatedFromLegacy": 0 }
+    },
+    {
+      "id": "malformed-or-unknown-version-save",
+      "description": "Malformed, missing-state or unknown-version save documents never become authoritative inventory.",
+      "legacySave": { "schemaVersion": 0, "state": { "owned": ["unknown-item"] } },
+      "expected": { "legacySave": "discard", "defaultState": "load", "canonicalRowsCreated": 0 }
+    },
+    {
+      "id": "preserve-existing-canonical-text-file",
+      "description": "A file already in netshift_player_files survives the legacy save reset and is rendered from canonical data.",
+      "canonicalRowsBefore": [{ "id": "00000000-0000-4000-8000-000000000001", "user_id": 101, "parent_path": "/desktop", "name": "notes.txt", "item_type": "file", "mime_type": "text/plain", "content": "server-side notes", "software_family": null, "software_level": null, "deleted_at": null, "recycle_bin_at": null }],
+      "legacySave": { "schemaVersion": 1, "state": { "localFiles": [{ "name": "notes.txt", "kind": "text", "content": "stale client copy" }] } },
+      "expected": { "legacySave": "discard", "canonicalRowsDeleted": 0, "canonicalRowsChanged": 0, "mirrorUsesCanonicalContent": true }
+    },
+    {
+      "id": "preserve-existing-canonical-software",
+      "description": "A server-owned software row remains owned; a missing UI representation must not be repaired by duplicating it.",
+      "canonicalRowsBefore": [{ "id": "00000000-0000-4000-8000-000000000002", "user_id": 101, "parent_path": "/downloads", "name": "Firewall Level 2.exe", "item_type": "software", "mime_type": "application/octet-stream", "content": "", "software_family": "firewall", "software_level": 2, "deleted_at": null, "recycle_bin_at": null }],
+      "legacySave": { "schemaVersion": 1, "state": { "owned": [], "archiveSoftware": [] } },
+      "expected": { "legacySave": "discard", "canonicalRowsDeleted": 0, "canonicalRowsCreatedFromLegacy": 0, "canonicalSoftwareRowCountAfter": 1 }
+    },
+    {
+      "id": "stale-client-v1-save-after-cutover",
+      "description": "A stale browser cannot recreate the discarded save via baseRevision zero.",
+      "request": { "method": "POST", "path": "/api/save", "body": { "schemaVersion": 1, "baseRevision": 0, "state": { "owned": ["crc2"], "accounts": { "player": { "balance": 999999 } } } } },
+      "expected": { "httpStatus": 400, "saveRowInserted": false, "protectedStateChanged": false }
+    },
+    {
+      "id": "v2-save-protected-state-injection",
+      "description": "The future save allowlist rejects or strips all protected gameplay fields rather than trusting the client's state object.",
+      "request": { "method": "POST", "path": "/api/save", "body": { "schemaVersion": 2, "baseRevision": 0, "preferences": { "lastAddress": "whois.com" }, "state": { "owned": ["forged"], "accounts": { "player": { "balance": 999999 } }, "cracked": { "finance": true } } } },
+      "expected": { "protectedStateChanged": false, "acceptedFields": "explicit-allowlist-only" }
+    },
+    {
+      "id": "reset-marker-retry-and-concurrency",
+      "description": "The named one-time reset is atomic and idempotent when startup/retries overlap.",
+      "concurrentRuns": 2,
+      "expected": { "resetAppliedCount": 1, "migrationReceiptCount": 1, "canonicalRowsDeleted": 0, "failedTransactionLeavesNoReceipt": true }
+    },
+    {
+      "id": "download-filename-conflict-rolls-back-claim",
+      "description": "A canonical file-name conflict cannot consume host stock without delivering the item.",
+      "claim": { "host": "finance", "itemId": "synthetic-item-1", "playerUserId": 101 },
+      "preexistingCanonicalFile": { "parent_path": "/downloads", "name": "Firewall Level 2.exe", "item_type": "software" },
+      "candidateClaimedItem": { "name": "Firewall Level 2.exe", "type": "software", "family": "firewall", "level": 2 },
+      "expected": { "transaction": "rollback", "hostStockUnchanged": true, "claimRowsCreated": 0, "playerRowsCreated": 0 }
+    },
+    {
+      "id": "concurrent-same-host-item-claim",
+      "description": "Two accounts racing for the same host item result in exactly one delivered item.",
+      "concurrentClaims": [{ "userId": 101, "itemId": "synthetic-item-2" }, { "userId": 202, "itemId": "synthetic-item-2" }],
+      "expected": { "successfulClaims": 1, "canonicalRowsCreated": 1, "hostItemRemaining": false }
+    }
+  ]
+}

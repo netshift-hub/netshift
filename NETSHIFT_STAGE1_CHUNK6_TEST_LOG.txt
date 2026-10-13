@@ -1,0 +1,46 @@
+NETSHIFT Stage 1 — Chunk 6 test log
+Scope: fail-closed profile and canonical-inventory hydration gate
+Working copy: /mnt/data/netshift-stage1-work
+Source reference: prior checkpoint records netshift-hub/netshift staging @ 06c28e60f348e1b2b1891d00db597180afd4eae0; live remote branch was not accessible from this runtime.
+Database access: none. No GitHub writes, push, deployment or DB reset.
+
+Final checks after code and documentation updates:
+- node --check server.js: PASS
+- node scripts/check-client.js: PASS (Client JavaScript syntax OK)
+- node scripts/check-stage1-hydration-gate.js: PASS
+- npm run check: PASS
+  - server.js syntax
+  - client JavaScript syntax
+  - multiplayer markers
+  - session ownership and persistent chat markers
+  - shared host compromise markers
+  - Core v2 schema/API/UI markers
+  - game identity checks
+  - Core files UI/save-ownership/Force Connect markers
+  - legacy save migration contract fixtures (12 scenarios)
+  - server save protocol checks
+  - client save protocol checks
+  - legacy save cutover isolated tests
+  - new hydration gate tests
+
+New hydration-gate test coverage:
+- valid/invalid required profile response shapes;
+- explicit empty inventory arrays accepted, missing/malformed lists rejected;
+- duplicate inventory IDs rejected within a list and across active/Recycle Bin lists (cross-list check is wired in loader);
+- required profile and inventory reads precede unlocking the app;
+- failed hydration exposes retry UI and keeps gameplay/save readiness false;
+- required API calls have a bounded timeout;
+- stale account/session-attempt responses are rejected and cannot overwrite current mirrors;
+- gameplay timer callbacks pause while an authenticated account is not hydrated;
+- shared-world connection is deferred to the successful hydration path.
+
+Important limitations:
+- These tests are static/helper tests; they do not launch a browser or exercise the complete DOM/login path.
+- No PostgreSQL/staging test was run. The existing save-cutover tests use an in-memory adapter and do not prove production database semantics.
+- The game's general legacy mechanics are not made server-authoritative by this chunk; their timer callbacks are paused during authenticated hydration only.
+- No GitHub operation, commit, push or deployment occurred.
+
+Archive verification is performed by `unzip -t NETSHIFT_Stage1_Chunk6_HydrationGate_Bundle.zip` after packaging.
+
+Packaging verification:
+- `unzip -t NETSHIFT_Stage1_Chunk6_HydrationGate_Bundle.zip`: PASS (no compressed-data errors). The final archive will be re-verified after including this log and hash manifest.

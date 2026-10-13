@@ -165,6 +165,10 @@
 .world-activity-v11 .event-time{display:block;color:#666;font-size:10px;margin-bottom:2px}
 .world-actions-v11{display:flex;gap:6px;flex-wrap:wrap}
 .world-actions-v11 button{font:11px Tahoma,Verdana,Arial,sans-serif}
+.world-host-inventory-v13{margin-top:8px;border:1px solid #999;background:#f7f7f7;padding:8px;overflow-wrap:anywhere}
+.world-host-item-v13{display:flex;gap:8px;align-items:center;justify-content:space-between;border-bottom:1px solid #ddd;padding:7px 0}
+.world-host-item-v13:last-child{border-bottom:0}
+.world-host-item-v13>div{min-width:0;overflow-wrap:anywhere}.world-host-item-v13 strong,.world-host-item-v13 small{display:block}.world-host-item-v13 small{color:#555;font-size:10px}.world-host-inventory-v13 h4{margin:0 0 5px}.world-host-inventory-v13 p{margin:4px 0 8px;font-size:11px;color:#444}
 .world-footnote-v11{margin:8px 0 0;color:#555;font-size:10px;line-height:1.45}
 @media(max-width:540px){.world-panel-v11{right:6px;bottom:82px;width:calc(100vw - 12px);max-height:80vh}.world-columns-v11{grid-template-columns:1fr}.world-list-v11{max-height:115px}}
 .world-chat-v12{height:145px;overflow:auto;background:#fff;border:2px inset #aaa;padding:6px;font:12px/1.4 "Courier New",monospace;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -178,7 +182,7 @@
 
 </style></head><body>
 <div class="wallpaper"></div><div class="desktop">
-<div class="desktop-icons" id="desktopIcons"><div class="deskicon" onclick="go('whois.com')"><span>🌐</span>Internet</div><div class="deskicon" ondblclick="openExplorerWindow()" onclick="openExplorerWindow()"><span>📁</span>My Files</div><div class="deskicon" ondblclick="openProcessesWindow()" onclick="openProcessesWindow()"><span>⏱️</span>Processes</div><div class="deskicon" ondblclick="openBankInfoWindow()" onclick="openBankInfoWindow()"><span>📝</span>bank-info.txt</div><div class="deskicon" ondblclick="openRouterWindow()" onclick="openRouterWindow()"><span>📡</span>router.exe</div><div id="softwareIcons" style="display:contents"></div></div>
+<div class="desktop-icons" id="desktopIcons"><div class="deskicon" onclick="go('whois.com')"><span>🌐</span>Internet</div><div class="deskicon" ondblclick="openExplorerWindow()" onclick="openExplorerWindow()"><span>📁</span>My Files</div><div class="deskicon" ondblclick="openProcessesWindow()" onclick="openProcessesWindow()"><span>⏱️</span>Processes</div><div class="deskicon" id="legacyBankInfoIcon" ondblclick="openBankInfoWindow()" onclick="openBankInfoWindow()"><span>📝</span>bank-info.txt</div><div class="deskicon" ondblclick="openRouterWindow()" onclick="openRouterWindow()"><span>📡</span>router.exe</div><div id="softwareIcons" style="display:contents"></div></div>
 <section class="window"><div class="titlebar"><span>NETSHIFT Internet Explorer 4.0 — Network browser</span><div class="controls"><button class="winbtn" title="Minimise">_</button><button class="winbtn" title="Maximise">□</button><button class="winbtn" title="Close">×</button></div></div><div class="menubar"><span>File</span><span>Edit</span><span>View</span><span>Favorites</span><span>Tools</span><span>Help</span></div><div class="toolbar"><button class="bevel" id="back">◀ Back</button><button class="bevel" id="forward" disabled>Forward ▶</button><button class="bevel" id="home">⌂ Home</button><span class="address-label">Address</span><input id="address" class="address" value="whois.com" autocomplete="off" spellcheck="false" aria-label="Address bar"><button class="bevel" id="go">Go</button></div><div id="browserContent" class="content"></div><div class="browser-status"><span id="statusText">Done</span><span>Internet zone · NETSHIFT dial-up connection</span></div></section>
 <div class="footer"><span>NETSHIFT Online — Network services directory</span><span>Connected at 28.8 kbps <span id="connectionStatus">●</span></span></div></div>
 <div class="taskbar"><button class="bevel start" onclick="toast('NETSHIFT START MENU — prototype')">▣ Start</button><button class="taskitem" onclick="go('whois.com')">🌐 NETSHIFT Internet</button><button class="taskitem" onclick="openExplorerWindow()">📁 My Files</button><div id="appTaskButtons" style="display:contents"></div><span class="clock" id="clock">9:41 PM</span></div><div id="toast" class="toast hidden"></div><div id="appWindows"></div><div id="contextMenu" class="context-menu hidden"></div>
@@ -186,8 +190,8 @@
 <div id="accountToolbar" class="account-toolbar" hidden aria-live="polite">
   <span>NETSHIFT ID:</span><span id="accountUsername" class="account-username">—</span>
   <span id="cloudSaveStatus" class="account-save-status">Not saved</span>
-  <button class="bevel" type="button" onclick="cloudSaveNow()">Save game</button>
-  <button class="bevel" type="button" id="cloudSaveReloadButton" onclick="netshiftResolveSaveConflict()" hidden>Load latest</button>
+  <button class="bevel" type="button" onclick="cloudSaveNow()">Save preferences</button>
+  <button class="bevel" type="button" id="cloudSaveReloadButton" onclick="netshiftResolveSaveConflict()" hidden>Load latest preferences</button>
   <button class="bevel" type="button" onclick="netshiftWorldToggle()">World</button>
   <button class="bevel" type="button" onclick="netshiftLogout()">Log out</button>
 </div>
@@ -197,7 +201,7 @@
     <div class="world-status-v11"><span>Realtime link: <strong id="worldConnectionStatus" class="offline">Connecting…</strong></span><span>Operators online: <strong id="worldOnlineCount">0</strong></span></div>
     <div class="world-columns-v11">
       <section class="world-box-v11"><h3>OPERATORS ONLINE</h3><ul id="worldPlayersList" class="world-list-v11"><li>Loading operator list…</li></ul><p class="world-micro-v11">Only public usernames are shown.</p></section>
-      <section class="world-box-v11"><h3>SHARED PUBLIC HOSTS</h3><select id="worldTargetSelect" class="world-target-select-v11" aria-label="Shared target"></select><div id="worldTargetDetails" class="world-target-detail-v11">Loading shared target registry…</div><div class="world-actions-v11"><button class="bevel" id="worldProbeButton" type="button" onclick="netshiftWorldProbe()">Probe host</button><button class="bevel" id="worldBreachButton" type="button" onclick="netshiftWorldBreach()" disabled>Attempt intrusion</button><button class="bevel" type="button" onclick="netshiftWorldRefresh()">Refresh</button></div></section>
+      <section class="world-box-v11"><h3>SHARED PUBLIC HOSTS</h3><select id="worldTargetSelect" class="world-target-select-v11" aria-label="Shared target"></select><div id="worldTargetDetails" class="world-target-detail-v11">Loading shared target registry…</div><div class="world-actions-v11"><button class="bevel" id="worldProbeButton" type="button" onclick="netshiftWorldProbe()">Probe host</button><button class="bevel" id="worldBreachButton" type="button" onclick="netshiftWorldBreach()" disabled>Attempt intrusion</button><button class="bevel" type="button" onclick="netshiftWorldRefresh()">Refresh</button></div><div id="worldHostInventory" class="world-host-inventory-v13" hidden aria-live="polite"></div></section>
     </div>
     <h3 style="margin-top:10px">SHARED ACTIVITY LOG</h3>
     <div id="worldActivityList" class="world-activity-v11"><div class="event">Waiting for shared events…</div></div>
@@ -238,7 +242,10 @@
         <button class="bevel" type="submit">Create account</button>
         <p class="account-small">Already registered? <button class="account-link" type="button" onclick="showAccountForm('login')">Return to sign in</button></p>
       </form>
+      <button id="forceConnectButton" class="bevel" type="button" onclick="netshiftForceConnect()" hidden style="margin-top:8px">Force Connect — take over unreachable session</button>
       <button id="cancelHandoffButton" class="bevel" type="button" onclick="netshiftCancelHandoff()" hidden style="margin-top:8px">Cancel sign-in request</button>
+      <button id="hydrationRetryButton" class="bevel" type="button" onclick="netshiftRetryHydration()" hidden style="margin-top:8px">Retry account loading</button>
+      <button id="hydrationSignOutButton" class="bevel" type="button" onclick="netshiftLogout()" hidden style="margin-top:8px">Sign out</button>
       <p class="account-small" style="margin-bottom:0">Use a unique password. Password recovery and email verification are not included in this first build; save your credentials safely.</p>
     </div>
   </div>
@@ -262,8 +269,16 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
 
-const PLAYER_IP = "10.0.0.7";
+let PLAYER_IP = "172.20.45.201"; // Replaced with the server-issued fictional workstation IP after authentication.
 const $ = id => document.getElementById(id);
+// Legacy simulation timers are registered before authentication has completed. Keep the
+// retro UI responsive, but pause gameplay mutations while an authenticated account is loading.
+function netshiftGuardGameplayTimer(callback) {
+  return (...args) => {
+    if (window.NETSHIFT_USER && !NETSHIFT_HYDRATION_READY) return;
+    return callback(...args);
+  };
+}
 const money = n => "$" + Number(n || 0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const state = {
@@ -604,8 +619,8 @@ $("address").addEventListener("keydown",e=>{if(e.key==="Enter")go($("address").v
 $("home").onclick=()=>go("whois.com");
 $("back").onclick=()=>{if(state.histIndex>0){state.histIndex--;go(state.history[state.histIndex],false);}};
 $("forward").onclick=()=>{if(state.histIndex<state.history.length-1){state.histIndex++;go(state.history[state.histIndex],false);}};
-setInterval(tick,100);
-setInterval(refreshCashout,5000);
+setInterval(netshiftGuardGameplayTimer(tick),100);
+setInterval(netshiftGuardGameplayTimer(refreshCashout),5000);
 setInterval(()=>{const d=new Date();$("clock").textContent=d.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});},1000);
 
 /* NETSHIFT progression, window manager and Explorer interactions v5 */
@@ -1216,7 +1231,7 @@ function refreshCashWindow() {
   const list=root.querySelector("#cashWarezList");
   if(list&&list.querySelectorAll(".explorer-row").length!==active.length)renderCashWindow(id);
 }
-setInterval(refreshCashWindow,5000);
+setInterval(netshiftGuardGameplayTimer(refreshCashWindow),5000);
 function renderBackendFilesRefresh(site) {if(state.view==="backend"&&state.currentSite===site)renderBackend(site,"files");}
 
 /* Public and local app routes are kept independent of the browser surface. */
@@ -2111,11 +2126,11 @@ document.addEventListener("keydown",function netshiftEnterKeyV11(e) {
     if(btn){e.preventDefault();btn.click();}
   }
 });
-setInterval(processNetworkDownloadsV11,100);
-setInterval(runNpcAttackV11,1000);
-setInterval(refreshCashWindow,5000);
+setInterval(netshiftGuardGameplayTimer(processNetworkDownloadsV11),100);
+setInterval(netshiftGuardGameplayTimer(runNpcAttackV11),1000);
+setInterval(netshiftGuardGameplayTimer(refreshCashWindow),5000);
 state.nextSecuritySweepAt=Date.now()+300000;
-setInterval(triggerSecurityProtocolV11,300000);
+setInterval(netshiftGuardGameplayTimer(triggerSecurityProtocolV11),300000);
 
 
 /* v11.1 polish: timed hardware installation, balanced infection odds, file utilities */
@@ -2246,8 +2261,8 @@ function tickSecurityNpcV11() {
   runNpcAttackV11();
 }
 
-setInterval(tickConnectionOrderV11,100);
-setInterval(tickSecurityNpcV11,1000);
+setInterval(netshiftGuardGameplayTimer(tickConnectionOrderV11),100);
+setInterval(netshiftGuardGameplayTimer(tickSecurityNpcV11),1000);
 
 /* v11.2: complete the latency loop and file download edge cases */
 const CPU_UPGRADE_PRICES_V11 = {2:3000,3:14000,4:50000,5:150000};
@@ -2400,7 +2415,7 @@ function tickBankTransferV11() {
     state.pendingBankTransfer=null;
   }
 }
-setInterval(tickBankTransferV11,100);
+setInterval(netshiftGuardGameplayTimer(tickBankTransferV11),100);
 
 
 /* v11.3 edge-case corrections */
@@ -3216,7 +3231,7 @@ function activateInfectionV11(file){
 }
 function startPopupSpamV16(){
   if(!state.pcInfections.popup)return;
-  if(!state.popupSpamTimerV16)state.popupSpamTimerV16=setInterval(()=>{
+  if(!state.popupSpamTimerV16)state.popupSpamTimerV16=setInterval(netshiftGuardGameplayTimer(()=>{
     if(!state.pcInfections.popup){clearPopupSpamV16();return;}
     if(state.popupSpamCountV16>=4)return;
     const layer=$("popupSpamWindowLayerV16");if(!layer)return;
@@ -3226,7 +3241,7 @@ function startPopupSpamV16(){
     el.style.left=left+"px";el.style.top=top+"px";
     el.innerHTML=`<div class="spam-title"><span>⚠ Advertisement</span><button onclick="closePopupSpamV16('${id}')">×</button></div><div class="spam-body"><h3>Congratulations!</h3><p>Your virtual computer has won a mystery prize.</p><p class="small">This is a simulated Popup Spammer infection.</p><button class="bevel" onclick="closePopupSpamV16('${id}')">Close</button></div>`;
     layer.appendChild(el);
-  },2600);
+  }),2600);
 }
 function closePopupSpamV16(id){$(id)?.remove();state.popupSpamCountV16=Math.max(0,state.popupSpamCountV16-1);}
 function clearPopupSpamV16(){
@@ -3557,11 +3572,11 @@ document.addEventListener("keydown",function enterFormsV16(e){
   }
 });
 setInterval(()=>{if(!activeBrowserSurfaceV16)initBrowserTabsV16();},250);
-setInterval(sweepSchedulerV16,5000);
-setInterval(processSecurityTickV16,100);
-setInterval(renderAppBalloonsTickerV16,2300);
-setInterval(refreshCashWindow,5000);
-setInterval(processAntivirusExpiryV16,15000);
+setInterval(netshiftGuardGameplayTimer(sweepSchedulerV16),5000);
+setInterval(netshiftGuardGameplayTimer(processSecurityTickV16),100);
+setInterval(netshiftGuardGameplayTimer(renderAppBalloonsTickerV16),2300);
+setInterval(netshiftGuardGameplayTimer(refreshCashWindow),5000);
+setInterval(netshiftGuardGameplayTimer(processAntivirusExpiryV16),15000);
 
 
 /* v16.1 consistency fixes, session-aware tabs, website visitor records and missing gameplay links */
@@ -4673,7 +4688,7 @@ function activateInfectionV11(file){
  localLog("Malware executed from "+file.name+".");refreshExplorerV11();
 }
 
-setInterval(processLocalMalwareJobsV16,100);
+setInterval(netshiftGuardGameplayTimer(processLocalMalwareJobsV16),100);
 
 /* v21 final integration: accessible account controls, level-five inventory, purchase feedback */
 buildLevel5FileList();
@@ -4793,13 +4808,18 @@ go('whois.com',false);
 
 
 
-/* NETSHIFT Online v1: account authentication and per-user cloud save.
-   Browser-tab HTML is deliberately excluded from saved snapshots, so saved data
-   cannot directly re-inject arbitrary HTML as a restored browser page. */
+/* NETSHIFT Online: account authentication and allowlisted preference sync.
+   Protected gameplay state is not part of the generic cloud-save payload. */
 const NETSHIFT_DEFAULT_STATE = JSON.parse(JSON.stringify(state));
 window.NETSHIFT_USER = null;
 let NETSHIFT_LAST_SAVED_FINGERPRINT = "";
 let NETSHIFT_SAVE_BUSY = false;
+let NETSHIFT_PREFERENCES_READY = false;
+let NETSHIFT_PROFILE_READY = false;
+let NETSHIFT_FILES_READY = false;
+let NETSHIFT_HYDRATION_READY = false;
+let NETSHIFT_HYDRATION_BUSY = false;
+let NETSHIFT_HYDRATION_ATTEMPT = 0;
 let NETSHIFT_SAVE_TIMER = null;
 let NETSHIFT_LOGOUT_BUSY = false;
 let NETSHIFT_SAVE_REVISION = 0;
@@ -4808,6 +4828,9 @@ let NETSHIFT_WORLD_SOCKET = null;
 let NETSHIFT_WORLD_DATA = {players:[], targets:[], events:[], chat:[]};
 let NETSHIFT_WORLD_PROBE_BUSY = false;
 let NETSHIFT_WORLD_BREACH_BUSY = false;
+let NETSHIFT_WORLD_HOST_INVENTORY_REQUEST = 0;
+let NETSHIFT_WORLD_HOST_INVENTORY_SLUG = null;
+let NETSHIFT_WORLD_HOST_DOWNLOAD_BUSY = false;
 let NETSHIFT_SESSION_HEARTBEAT = null;
 let NETSHIFT_ACTIVE_HANDOFF = null;
 let NETSHIFT_HANDOFF_POLL_ID = null;
@@ -4828,8 +4851,39 @@ function showAccountForm(which) {
   login.hidden = registering; register.hidden = !registering;
   $("authTitle").textContent = registering ? "NETSHIFT Online — Create Account" : "NETSHIFT Online — Account Sign In";
   netshiftSetAuthMessage("");
+  const forceButton = $("forceConnectButton"); if (forceButton) forceButton.hidden = true;
+  const retryButton = $("hydrationRetryButton"); if (retryButton) retryButton.hidden = true;
+  const signOutButton = $("hydrationSignOutButton"); if (signOutButton) signOutButton.hidden = true;
   const first = $(registering ? "registerUsername" : "loginUsername");
   if (first) first.focus();
+}
+function netshiftShowHydrationGate(message, { retryable = false, failed = false } = {}) {
+  const overlay = $("authOverlay");
+  if (overlay) overlay.hidden = false;
+  const title = $("authTitle"); if (title) title.textContent = failed ? "NETSHIFT Online — Account Data Unavailable" : "NETSHIFT Online — Loading Account";
+  const login = $("loginForm"); if (login) login.hidden = true;
+  const register = $("registerForm"); if (register) register.hidden = true;
+  const force = $("forceConnectButton"); if (force) force.hidden = true;
+  const cancel = $("cancelHandoffButton"); if (cancel) cancel.hidden = true;
+  const retry = $("hydrationRetryButton"); if (retry) { retry.hidden = !retryable; retry.disabled = false; retry.textContent = "Retry account loading"; }
+  const signOut = $("hydrationSignOutButton"); if (signOut) signOut.hidden = !failed;
+  netshiftSetAuthMessage(message, failed ? "error" : "success");
+}
+function netshiftCompleteHydration(user) {
+  NETSHIFT_HYDRATION_READY = true;
+  const retry = $("hydrationRetryButton"); if (retry) retry.hidden = true;
+  const signOut = $("hydrationSignOutButton"); if (signOut) signOut.hidden = true;
+  const login = $("loginForm"); if (login) login.hidden = true;
+  const register = $("registerForm"); if (register) register.hidden = true;
+  const overlay = $("authOverlay"); if (overlay) overlay.hidden = true;
+  const toolbar = $("accountToolbar"); if (toolbar) toolbar.hidden = false;
+  const title = $("authTitle"); if (title) title.textContent = "NETSHIFT Online — Account Sign In";
+  netshiftSetAuthMessage("");
+  document.title = `NETSHIFT Online — ${user.username}`;
+  netshiftWorldConnect();
+}
+function netshiftGameplayIsBlocked() {
+  return !!window.NETSHIFT_USER && !NETSHIFT_HYDRATION_READY;
 }
 async function netshiftApi(path, options={}) {
   const response = await fetch(path, {
@@ -4841,36 +4895,38 @@ async function netshiftApi(path, options={}) {
   try { payload = await response.json(); } catch (_) { /* non-JSON response */ }
   if (!response.ok) {
     const error = new Error(payload.error || `Request failed (${response.status}).`);
-    error.status = response.status; error.code = payload.code || null;
+    error.status = response.status; error.code = payload.code || null; error.data = payload;
     throw error;
   }
   return payload;
+}
+async function netshiftApiWithTimeout(path, options = {}, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await netshiftApi(path, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error(`Timed out while loading ${path}. Check the connection and retry.`);
+    throw error;
+  } finally { clearTimeout(timer); }
 }
 function netshiftSetSaveStatus(text) {
   const el = $("cloudSaveStatus"); if (el) el.textContent = text;
 }
 function netshiftSetAuthenticated(user) {
   NETSHIFT_SESSION_ENDING = false;
+  NETSHIFT_PREFERENCES_READY = false;
+  NETSHIFT_PROFILE_READY = false;
+  NETSHIFT_FILES_READY = false;
+  NETSHIFT_HYDRATION_READY = false;
   window.NETSHIFT_USER = user;
   netshiftStartSessionHeartbeat();
   $("accountUsername").textContent = user.username;
-  $("accountToolbar").hidden = false;
-  $("authOverlay").hidden = true;
-  netshiftSetSaveStatus("Connected · cloud saves on");
+  $("accountToolbar").hidden = true;
+  $("worldPanel").hidden = true;
+  netshiftSetSaveStatus("Loading account data…");
   document.title = `NETSHIFT Online — ${user.username}`;
-  netshiftWorldConnect();
-}
-function netshiftDeepMerge(target, source) {
-  if (!source || typeof source !== "object" || Array.isArray(source)) return target;
-  for (const [key, value] of Object.entries(source)) {
-    if (key === "browserSurfacesV16") continue;
-    if (Array.isArray(value)) target[key] = value;
-    else if (value && typeof value === "object") {
-      if (!target[key] || typeof target[key] !== "object" || Array.isArray(target[key])) target[key] = {};
-      netshiftDeepMerge(target[key], value);
-    } else target[key] = value;
-  }
-  return target;
+  netshiftShowHydrationGate("Loading your server profile and canonical files. Gameplay will remain locked until both have loaded successfully.");
 }
 function netshiftResetGameState() {
   // Avoid exposing the previous account's open app windows after a sign-out/account switch.
@@ -4888,124 +4944,190 @@ function netshiftResetGameState() {
   }
   if (activeBrowserSurfaceV16 && typeof openBrowserTabStripV16 === "function") openBrowserTabStripV16(activeBrowserSurfaceV16);
 }
+function netshiftIsValidPreferenceAddress(value) {
+  if (typeof value !== "string") return false;
+  const address = value.trim().toLowerCase();
+  if (!address || address.length > 253 || /[\u0000-\u001f\u007f\s]/.test(address)) return false;
+  if (["router://admin", "bank-info://local", "ftpcash://local"].includes(address)) return true;
+  const hostLabel = "[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?";
+  return new RegExp(`^(?=.{1,253}$)${hostLabel}(?:\\.${hostLabel})*$`, "i").test(address);
+}
+function netshiftNormalisePreferenceAddress(value) {
+  const address = typeof value === "string" ? value.trim().toLowerCase() : "";
+  return netshiftIsValidPreferenceAddress(address) ? address : "whois.com";
+}
 function netshiftSnapshot() {
-  const safeState = JSON.parse(JSON.stringify(state));
-  const primary = (state.browserSurfacesV16 || []).find(s => s.primary);
-  const address = primary?.active?.address || $("address")?.value || "whois.com";
-  // These are web-session state, not persistent progress. Require fresh logins after reload.
-  delete safeState.browserSurfacesV16;
-  safeState.bankSession = null;
-  safeState.bank2Session = null;
-  safeState.editingLog = false;
-  if (safeState.access && typeof safeState.access === "object") {
-    for (const key of Object.keys(safeState.access)) safeState.access[key] = false;
-  }
-  safeState.adminSessionsV16 = {};
+  const primary = (state.browserSurfacesV16 || []).find(surface => surface.primary);
+  const currentAddress = primary?.active?.address || $("address")?.value || "whois.com";
   return {
-    schemaVersion: 1,
-    savedAt: new Date().toISOString(),
-    client: { address },
-    state: safeState
+    schemaVersion: 2,
+    preferences: { lastAddress: netshiftNormalisePreferenceAddress(currentAddress) }
   };
 }
-function netshiftFingerprint(snapshot) { const comparable = { ...snapshot, savedAt: null }; delete comparable.baseRevision; return JSON.stringify(comparable); }
+function netshiftFingerprint(snapshot) {
+  // Revision is transport metadata; only allowlisted preferences define the fingerprint.
+  return JSON.stringify({ schemaVersion: snapshot?.schemaVersion, preferences: snapshot?.preferences });
+}
+function netshiftSaveRevisionFrom(result, fallback = 0) {
+  const candidate = Number(result?.currentRevision ?? result?.revision ?? fallback);
+  return Number.isSafeInteger(candidate) && candidate >= 0 ? candidate : fallback;
+}
 async function netshiftSave({force=false, quiet=false, keepalive=false, allowHandoff=false}={}) {
   if (!window.NETSHIFT_USER || NETSHIFT_SAVE_BUSY) return false;
   if (NETSHIFT_ACTIVE_HANDOFF && !allowHandoff) return false;
+  if (!NETSHIFT_PREFERENCES_READY) {
+    netshiftSetSaveStatus(NETSHIFT_LAST_SAVED_FINGERPRINT === "__save_read_failed__" ? "Preferences unavailable · reload before saving" : "Loading preferences…");
+    if (!quiet) toast("Preferences are not ready to save yet. Wait for the account preferences to finish loading.");
+    return false;
+  }
+  if (NETSHIFT_LAST_SAVED_FINGERPRINT === "__save_read_failed__") {
+    netshiftSetSaveStatus("Preferences unavailable · reload before saving");
+    if (!quiet) toast("The latest saved preferences could not be loaded. Reload or reconnect before saving to avoid overwriting an unknown revision.");
+    return false;
+  }
   if (NETSHIFT_SAVE_CONFLICTED) {
-    netshiftSetSaveStatus("Save conflict · load latest");
-    if (!quiet) toast("This account's save changed in another session. Use Load latest before saving again.");
+    netshiftSetSaveStatus("Preference conflict · load latest");
+    if (!quiet) toast("These preferences changed in another session. Use Load latest before saving again.");
     return false;
   }
   let snapshot;
   try { snapshot = netshiftSnapshot(); snapshot.baseRevision = NETSHIFT_SAVE_REVISION; }
   catch (error) {
-    netshiftSetSaveStatus("Save error · state snapshot failed");
-    if (!quiet) toast("Could not prepare save data. Please report this issue.");
-    console.error("NETSHIFT save snapshot failed", error);
+    netshiftSetSaveStatus("Save error · preference snapshot failed");
+    if (!quiet) toast("Could not prepare preferences. Please report this issue.");
+    console.error("NETSHIFT preference snapshot failed", error);
     return false;
   }
   const fingerprint = netshiftFingerprint(snapshot);
   if (!force && fingerprint === NETSHIFT_LAST_SAVED_FINGERPRINT) return true;
   NETSHIFT_SAVE_BUSY = true;
-  netshiftSetSaveStatus("Saving…");
+  netshiftSetSaveStatus("Saving preferences…");
   try {
     const saveResult = await netshiftApi("/api/save", {
       method: "POST",
       body: JSON.stringify(snapshot),
       ...(keepalive ? { keepalive: true } : {})
     });
-    NETSHIFT_SAVE_REVISION = Number(saveResult.revision || 0);
+    NETSHIFT_SAVE_REVISION = netshiftSaveRevisionFrom(saveResult, NETSHIFT_SAVE_REVISION);
     NETSHIFT_LAST_SAVED_FINGERPRINT = fingerprint;
     const time = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
-    netshiftSetSaveStatus("Saved " + time);
-    if (!quiet) toast("Game progress saved to your NETSHIFT account.");
+    netshiftSetSaveStatus("Preferences saved " + time);
+    if (!quiet) toast("Your NETSHIFT preferences have been saved.");
     return true;
   } catch (error) {
     if (error.status === 409) {
       NETSHIFT_SAVE_CONFLICTED = true;
       const reloadButton = $("cloudSaveReloadButton"); if (reloadButton) reloadButton.hidden = false;
-      netshiftSetSaveStatus("Save conflict · load latest");
-      if (!quiet) toast("Another session saved newer progress. Load the latest save before saving again.");
+      netshiftSetSaveStatus("Preference conflict · load latest");
+      if (!quiet) toast("Another session saved newer preferences. Load the latest preferences before saving again.");
     } else {
-      netshiftSetSaveStatus(error.status === 401 ? "Session expired · sign in again" : "Save failed · retrying");
-      if (!quiet) toast("Cloud save failed: " + error.message);
+      netshiftSetSaveStatus(error.status === 401 ? "Session expired · sign in again" : "Preference save failed · retrying");
+      if (!quiet) toast("Could not save preferences: " + error.message);
     }
-    console.error("NETSHIFT cloud save failed", error);
+    console.error("NETSHIFT preference save failed", error);
     return false;
   } finally { NETSHIFT_SAVE_BUSY = false; }
 }
 function cloudSaveNow() { return netshiftSave({force:true, quiet:false}); }
 function netshiftRestoreSave(snapshot) {
-  if (!snapshot || snapshot.schemaVersion !== 1 || !snapshot.state || typeof snapshot.state !== "object") return false;
-  netshiftResetGameState();
-  netshiftDeepMerge(state, snapshot.state);
-  // Login/session flags are reset regardless of what's in a stored save.
-  state.bankSession = null; state.bank2Session = null; state.editingLog = false;
-  if (state.access && typeof state.access === "object") for (const key of Object.keys(state.access)) state.access[key] = false;
-  state.adminSessionsV16 = {};
-  if (typeof activeBrowserSurfaceV16 !== "undefined") {
-    activeBrowserSurfaceV16 = state.browserSurfacesV16?.find(s => s.primary) || state.browserSurfacesV16?.[0] || null;
-    if (activeBrowserSurfaceV16 && typeof openBrowserTabStripV16 === "function") openBrowserTabStripV16(activeBrowserSurfaceV16);
-  }
-  state.accounts = state.accounts || {};
-  state.accounts.player = state.accounts.player || {key:"player",number:"100001",balance:500,kind:"Player"};
-  state.accounts.player.username = window.NETSHIFT_USER.username;
-  state.accounts.player.name = window.NETSHIFT_USER.username;
-  const addr = snapshot.client?.address || "whois.com";
-  try { go(addr, false); } catch (error) { console.warn("Could not restore prior page", error); go("whois.com", false); }
+  if (!snapshot || snapshot.schemaVersion !== 2 || !snapshot.preferences || typeof snapshot.preferences !== "object" || Array.isArray(snapshot.preferences)) return false;
+  const allowedTopLevelKeys = new Set(["schemaVersion", "preferences"]);
+  if (Object.keys(snapshot).some(key => !allowedTopLevelKeys.has(key))) return false;
+  const allowedKeys = new Set(["lastAddress"]);
+  if (Object.keys(snapshot.preferences).some(key => !allowedKeys.has(key))) return false;
+  if (Object.prototype.hasOwnProperty.call(snapshot.preferences, "lastAddress") && !netshiftIsValidPreferenceAddress(snapshot.preferences.lastAddress)) return false;
+  const address = netshiftNormalisePreferenceAddress(snapshot.preferences.lastAddress);
+  try { go(address, false); }
+  catch (error) { console.warn("Could not restore saved address preference", error); go("whois.com", false); }
   return true;
 }
 async function netshiftAfterAuth(user) {
+  if (NETSHIFT_HYDRATION_BUSY) return false;
+  NETSHIFT_HYDRATION_BUSY = true;
+  const attempt = ++NETSHIFT_HYDRATION_ATTEMPT;
   netshiftSetAuthenticated(user);
-  let result = { save: null };
-  let readFailed = false;
-  try { result = await netshiftApi("/api/save", {method:"GET"}); }
-  catch (error) {
-    readFailed = true;
-    console.error("NETSHIFT cloud save could not be read", error);
-    netshiftSetSaveStatus("Cloud save unavailable");
-    toast("Could not load cloud save. Existing server data has not been changed.");
-  }
-  let restored = false;
-  NETSHIFT_SAVE_REVISION = readFailed ? 0 : Number(result.revision || 0);
+  NETSHIFT_LAST_SAVED_FINGERPRINT = "__save_read_failed__"; // Fail closed while the initial revision is unknown.
+  NETSHIFT_SAVE_REVISION = 0;
   NETSHIFT_SAVE_CONFLICTED = false;
-  const reloadButton = $("cloudSaveReloadButton"); if (reloadButton) reloadButton.hidden = true;
-  if (!readFailed && result.save) restored = netshiftRestoreSave(result.save);
-  else if (!readFailed) {
-    netshiftResetGameState();
-    state.accounts.player.username = user.username;
-    state.accounts.player.name = user.username;
-    go("whois.com", false);
-  }
-  // When a load failed, don't overwrite an existing cloud save automatically.
-  NETSHIFT_LAST_SAVED_FINGERPRINT = readFailed ? "__save_read_failed__" : netshiftFingerprint(netshiftSnapshot());
-  if (!readFailed) netshiftSetSaveStatus(restored ? "Cloud save loaded" : "New game · cloud saves on");
-  if (restored) toast("Saved game loaded for " + user.username + ".");
   if (NETSHIFT_SAVE_TIMER) clearInterval(NETSHIFT_SAVE_TIMER);
-  NETSHIFT_SAVE_TIMER = setInterval(() => {
-    if (NETSHIFT_LAST_SAVED_FINGERPRINT !== "__save_read_failed__" && !NETSHIFT_SAVE_CONFLICTED) netshiftSave({quiet:true});
-  }, 4000);
+  NETSHIFT_SAVE_TIMER = null;
+  NETSHIFT_CORE_PROFILE = null;
+  NETSHIFT_CORE_FILES = [];
+  NETSHIFT_CORE_RECYCLE_FILES = [];
+  netshiftResetGameState();
+  state.accounts.player.username = user.username;
+  state.accounts.player.name = user.username;
+  const reloadButton = $("cloudSaveReloadButton"); if (reloadButton) reloadButton.hidden = true;
+
+  try {
+    // These two reads are required. A failed or malformed response must not look like
+    // a valid empty profile or an empty inventory.
+    const profile = await netshiftCoreLoadProfile({ quiet: true, required: true });
+    if (attempt !== NETSHIFT_HYDRATION_ATTEMPT || window.NETSHIFT_USER?.id !== user.id) return false;
+    if (!profile) throw new Error("The server did not return a valid player profile.");
+    NETSHIFT_PROFILE_READY = true;
+
+    await netshiftCoreLoadFiles({ quiet: true, required: true });
+    if (attempt !== NETSHIFT_HYDRATION_ATTEMPT || window.NETSHIFT_USER?.id !== user.id) return false;
+    NETSHIFT_FILES_READY = true;
+
+    let result = { save: null };
+    let readFailed = false;
+    try { result = await netshiftApiWithTimeout("/api/save", {method:"GET"}); }
+    catch (error) {
+      if (error.status === 401 || error.code === "SESSION_REVOKED") {
+        netshiftForceSessionEnd("This NETSHIFT ID is no longer owned by this browser session. Sign in again to request access.");
+        return false;
+      }
+      readFailed = true;
+      console.error("NETSHIFT cloud preferences could not be read", error);
+    }
+    if (attempt !== NETSHIFT_HYDRATION_ATTEMPT || window.NETSHIFT_USER?.id !== user.id) return false;
+
+    let restored = false;
+    NETSHIFT_SAVE_REVISION = readFailed ? 0 : netshiftSaveRevisionFrom(result, 0);
+    if (!readFailed && result.save) restored = netshiftRestoreSave(result.save);
+    if (!readFailed && !restored) go("whois.com", false);
+    NETSHIFT_PREFERENCES_READY = !readFailed;
+    NETSHIFT_LAST_SAVED_FINGERPRINT = readFailed ? "__save_read_failed__" : netshiftFingerprint(netshiftSnapshot());
+
+    // Normal play, world sockets and the autosave timer are enabled only after both
+    // required server reads have completed and their payloads have been validated.
+    if (!NETSHIFT_PROFILE_READY || !NETSHIFT_FILES_READY) throw new Error("Required account data has not finished loading.");
+    netshiftCompleteHydration(user);
+    if (readFailed) {
+      netshiftSetSaveStatus("Account ready · preferences unavailable; saving paused");
+      toast("Your profile and inventory loaded, but saved preferences are unavailable. Gameplay is ready; preference saving is paused until they can be reloaded.");
+    } else {
+      netshiftSetSaveStatus(restored ? "Preferences loaded" : "Default preferences · sync on");
+      if (restored) toast("Saved preferences loaded for " + user.username + ".");
+      NETSHIFT_SAVE_TIMER = setInterval(netshiftGuardGameplayTimer(() => {
+        if (NETSHIFT_HYDRATION_READY && NETSHIFT_PREFERENCES_READY && NETSHIFT_LAST_SAVED_FINGERPRINT !== "__save_read_failed__" && !NETSHIFT_SAVE_CONFLICTED) netshiftSave({quiet:true});
+      }), 4000);
+    }
+    return true;
+  } catch (error) {
+    if (attempt !== NETSHIFT_HYDRATION_ATTEMPT || window.NETSHIFT_USER?.id !== user.id) return false;
+    NETSHIFT_HYDRATION_READY = false;
+    NETSHIFT_PREFERENCES_READY = false;
+    NETSHIFT_LAST_SAVED_FINGERPRINT = "__save_read_failed__";
+    if (error.status === 401 || error.code === "SESSION_REVOKED") {
+      netshiftForceSessionEnd("This NETSHIFT ID is no longer owned by this browser session. Sign in again to request access.");
+      return false;
+    }
+    console.error("NETSHIFT account hydration failed", error);
+    netshiftSetSaveStatus("Account data unavailable · retry required");
+    netshiftShowHydrationGate("NETSHIFT could not load the required server profile and inventory. No empty inventory has been assumed, gameplay and autosaving remain paused, and server records have not been reset. Check your connection and retry.", { retryable: true, failed: true });
+    return false;
+  } finally {
+    if (attempt === NETSHIFT_HYDRATION_ATTEMPT) NETSHIFT_HYDRATION_BUSY = false;
+  }
+}
+async function netshiftRetryHydration() {
+  if (!window.NETSHIFT_USER || NETSHIFT_HYDRATION_BUSY) return false;
+  const button = $("hydrationRetryButton"); if (button) { button.disabled = true; button.textContent = "Retrying…"; }
+  netshiftShowHydrationGate("Retrying your server profile and canonical inventory…");
+  return netshiftAfterAuth(window.NETSHIFT_USER);
 }
 function netshiftStartSessionHeartbeat() {
   if (NETSHIFT_SESSION_HEARTBEAT) clearInterval(NETSHIFT_SESSION_HEARTBEAT);
@@ -5117,13 +5239,13 @@ async function netshiftDecideHandoff(decision) {
   if (handoff.expired && decision === 'yes') return;
   handoff.busy = true;
   $('sessionHandoffYes').disabled = true; $('sessionHandoffNo').disabled = true;
-  $('sessionHandoffMessage').textContent = decision === 'yes' ? 'Saving current progress and transferring access…' : 'Declining the sign-in request…';
+  $('sessionHandoffMessage').textContent = decision === 'yes' ? 'Saving preferences and transferring access…' : 'Declining the sign-in request…';
   try {
     if (decision === 'yes') {
       const saved = await netshiftSave({force:true, quiet:true, allowHandoff:true});
       if (!saved) {
         handoff.busy = false; $('sessionHandoffYes').disabled = !!handoff.expired; $('sessionHandoffNo').disabled = false;
-        $('sessionHandoffMessage').textContent = 'A final save could not be confirmed. Try Yes again when the connection is stable, or select No to keep this session.';
+        $('sessionHandoffMessage').textContent = 'A final preference save could not be confirmed. Try Yes again when the connection is stable, or select No to keep this session.';
         return;
       }
     }
@@ -5151,6 +5273,10 @@ async function netshiftDecideHandoff(decision) {
 }
 function netshiftForceSessionEnd(message) {
   if (NETSHIFT_SESSION_ENDING) return;
+  NETSHIFT_HYDRATION_ATTEMPT++;
+  NETSHIFT_HYDRATION_READY = false;
+  NETSHIFT_HYDRATION_BUSY = false;
+  NETSHIFT_PROFILE_READY = false; NETSHIFT_FILES_READY = false;
   NETSHIFT_SESSION_ENDING = true;
   netshiftHideHandoffModal();
   netshiftStopSessionHeartbeat();
@@ -5158,6 +5284,8 @@ function netshiftForceSessionEnd(message) {
   if (NETSHIFT_SAVE_TIMER) clearInterval(NETSHIFT_SAVE_TIMER);
   NETSHIFT_SAVE_TIMER = null;
   window.NETSHIFT_USER = null;
+  NETSHIFT_PREFERENCES_READY = false;
+  NETSHIFT_PROFILE_READY = false; NETSHIFT_FILES_READY = false; NETSHIFT_HYDRATION_READY = false;
   NETSHIFT_LAST_SAVED_FINGERPRINT = '';
   NETSHIFT_SAVE_REVISION = 0; NETSHIFT_SAVE_CONFLICTED = false;
   const reloadButton = $('cloudSaveReloadButton'); if (reloadButton) reloadButton.hidden = true;
@@ -5169,7 +5297,10 @@ function netshiftForceSessionEnd(message) {
   showAccountForm('login');
   netshiftSetAuthMessage(message || 'This account session has ended. Sign in again to continue.', 'error');
 }
-document.addEventListener('keydown', event => {
+document.addEventListener("keydown", event => {
+  if (netshiftGameplayIsBlocked() && !event.target?.closest?.("#authOverlay")) {
+    event.preventDefault(); event.stopImmediatePropagation(); return;
+  }
   if ($('sessionHandoffOverlay')?.hidden === false) {
     if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); return; }
     if (event.key === 'Tab') {
@@ -5209,12 +5340,18 @@ async function netshiftHandleAuthSubmit(event, mode) {
     await netshiftAfterAuth(result.user);
   } catch (error) {
     netshiftSetAuthMessage(error.message, "error");
+    const forceButton = $("forceConnectButton");
+    if (forceButton) forceButton.hidden = error.code !== "ACTIVE_SESSION_UNREACHABLE";
   } finally {
     if (submit) { submit.textContent = isRegister ? "Create account" : "Connect"; submit.disabled = !!NETSHIFT_HANDOFF_POLL_ID; }
   }
 }
 async function netshiftLogout() {
   if (!window.NETSHIFT_USER || NETSHIFT_LOGOUT_BUSY) return;
+  NETSHIFT_HYDRATION_ATTEMPT++;
+  NETSHIFT_HYDRATION_READY = false;
+  NETSHIFT_HYDRATION_BUSY = false;
+  NETSHIFT_PROFILE_READY = false; NETSHIFT_FILES_READY = false;
   NETSHIFT_LOGOUT_BUSY = true;
   try {
     await netshiftSave({force:true, quiet:true});
@@ -5225,12 +5362,13 @@ async function netshiftLogout() {
     netshiftWorldDisconnect();
     netshiftStopSessionHeartbeat();
     if (NETSHIFT_SAVE_TIMER) clearInterval(NETSHIFT_SAVE_TIMER);
-    NETSHIFT_SAVE_TIMER = null; window.NETSHIFT_USER = null; NETSHIFT_LAST_SAVED_FINGERPRINT = "";
+    NETSHIFT_SAVE_TIMER = null; window.NETSHIFT_USER = null; NETSHIFT_PREFERENCES_READY = false; NETSHIFT_LAST_SAVED_FINGERPRINT = "";
+    NETSHIFT_PROFILE_READY = false; NETSHIFT_FILES_READY = false; NETSHIFT_HYDRATION_READY = false;
     NETSHIFT_SAVE_REVISION = 0; NETSHIFT_SAVE_CONFLICTED = false;
     const reloadButton = $("cloudSaveReloadButton"); if (reloadButton) reloadButton.hidden = true;
     $("worldPanel").hidden = true;
     $("accountToolbar").hidden = true; $("authOverlay").hidden = false;
-    netshiftSetAuthMessage("You have been signed out. Your last saved progress remains linked to your account.", "success");
+    netshiftSetAuthMessage("You have been signed out. Your saved preferences remain linked to your account.", "success");
     showAccountForm("login");
     netshiftResetGameState(); go("whois.com", false);
     document.title = "NETSHIFT Online";
@@ -5246,7 +5384,7 @@ document.addEventListener("visibilitychange", () => {
 });
 window.addEventListener("pagehide", () => {
   // Avoid racing the normal autosave with a second request using the same revision.
-  if (!window.NETSHIFT_USER || NETSHIFT_SAVE_BUSY || NETSHIFT_SAVE_CONFLICTED) return;
+  if (!window.NETSHIFT_USER || !NETSHIFT_PREFERENCES_READY || NETSHIFT_SAVE_BUSY || NETSHIFT_SAVE_CONFLICTED || NETSHIFT_LAST_SAVED_FINGERPRINT === "__save_read_failed__") return;
   try {
     const snapshot = netshiftSnapshot();
     snapshot.baseRevision = NETSHIFT_SAVE_REVISION;
@@ -5254,7 +5392,7 @@ window.addEventListener("pagehide", () => {
       .then(async response => {
         if (!response.ok) return;
         const result = await response.json();
-        NETSHIFT_SAVE_REVISION = Number(result.revision || NETSHIFT_SAVE_REVISION);
+        NETSHIFT_SAVE_REVISION = netshiftSaveRevisionFrom(result, NETSHIFT_SAVE_REVISION);
       }).catch(()=>{});
   } catch (_) { /* periodic saves remain the primary safeguard */ }
 });
@@ -5268,6 +5406,9 @@ window.addEventListener("pagehide", () => {
       if (result.pendingHandoffId) {
         netshiftSetAuthMessage('A sign-in request is already waiting for the active session to respond. Keep this page open.', 'success');
         netshiftBeginHandoffPoll(result.pendingHandoffId);
+      } else if (result.pendingForceConnect) {
+        netshiftSetAuthMessage(`The previous sign-in for ${result.pendingUsername || 'this account'} confirmed the password but could not reach the active session. You can force-connect or reload to abandon the request.`, 'error');
+        $('forceConnectButton').hidden = false;
       } else if (result.code === 'SESSION_REVOKED') netshiftSetAuthMessage(result.message || 'This browser no longer owns the account. Sign in to request access.', 'error');
     }
   } catch (error) {
@@ -5284,19 +5425,19 @@ async function netshiftResolveSaveConflict() {
   const btn = $("cloudSaveReloadButton"); if (btn) { btn.disabled = true; btn.textContent = "Loading…"; }
   try {
     const result = await netshiftApi("/api/save", {method:"GET"});
-    NETSHIFT_SAVE_REVISION = Number(result.revision || 0);
-    if (result.save) netshiftRestoreSave(result.save);
-    else { netshiftResetGameState(); go("whois.com", false); }
+    NETSHIFT_SAVE_REVISION = netshiftSaveRevisionFrom(result, 0);
+    const restored = result.save ? netshiftRestoreSave(result.save) : (go("whois.com", false), true);
+    if (!restored) throw new Error("The server returned an invalid preferences document.");
     NETSHIFT_SAVE_CONFLICTED = false;
     NETSHIFT_LAST_SAVED_FINGERPRINT = netshiftFingerprint(netshiftSnapshot());
     if (btn) btn.hidden = true;
-    netshiftSetSaveStatus("Latest save loaded");
-    toast("Latest cloud save loaded. Your unsaved local changes from the stale session were replaced.");
+    netshiftSetSaveStatus("Latest preferences loaded");
+    toast("Latest saved preferences loaded. Gameplay state is not stored in cloud saves.");
   } catch (error) {
-    netshiftSetSaveStatus("Could not load latest save");
+    netshiftSetSaveStatus("Could not load latest preferences");
     toast("Could not resolve save conflict: " + error.message);
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = "Load latest"; }
+    if (btn) { btn.disabled = false; btn.textContent = "Load latest preferences"; }
   }
 }
 
@@ -5322,7 +5463,15 @@ function netshiftWorldRenderTargetDetails() {
   const ownerStatus = target.compromisedByUsername
     ? `COMPROMISED · CONTROLLED BY ${esc(target.compromisedByUsername)}${isMine ? ' (YOU)' : ''}`
     : 'STATUS · UNCLAIMED';
-  detail.innerHTML = `<strong>${esc(target.name)}</strong><br><span class="world-micro-v11">${esc(target.domain)} · Firewall L${Number(target.securityLevel)}</span><p style="margin:5px 0">${esc(target.description)}</p><span class="world-micro-v11">${ownerStatus}</span><br><span class="world-micro-v11">Global probes: ${Number(target.probeCount || 0)}${target.lastProbedByUsername ? ` · Last probe by ${esc(target.lastProbedByUsername)}` : ''}</span><br><span class="world-micro-v11">Your probes: ${Number(target.myProbeCount || 0)} · Intrusion attempts are server-rolled; claimed hosts are harder to seize.</span>`;
+  const inventoryPanel = $('worldHostInventory');
+  if (inventoryPanel && (!isMine || (NETSHIFT_WORLD_HOST_INVENTORY_SLUG && NETSHIFT_WORLD_HOST_INVENTORY_SLUG !== target.slug))) {
+    NETSHIFT_WORLD_HOST_INVENTORY_REQUEST += 1;
+    NETSHIFT_WORLD_HOST_INVENTORY_SLUG = null;
+    inventoryPanel.hidden = true;
+    inventoryPanel.innerHTML = '';
+  }
+  const inventoryAction = isMine ? '<p style="margin:7px 0 0"><button class="bevel" type="button" onclick="netshiftWorldLoadHostInventory()">View host downloads</button></p>' : '';
+  detail.innerHTML = `<strong>${esc(target.name)}</strong><br><span class="world-micro-v11">${esc(target.domain)} · Firewall L${Number(target.securityLevel)}</span><p style="margin:5px 0">${esc(target.description)}</p><span class="world-micro-v11">${ownerStatus}</span><br><span class="world-micro-v11">Global probes: ${Number(target.probeCount || 0)}${target.lastProbedByUsername ? ` · Last probe by ${esc(target.lastProbedByUsername)}` : ''}</span><br><span class="world-micro-v11">Your probes: ${Number(target.myProbeCount || 0)} · Intrusion attempts are server-rolled; claimed hosts are harder to seize.</span>${inventoryAction}`;
   const breachButton = $('worldBreachButton');
   if (breachButton) {
     const ready = Number(target.myProbeCount || 0) > 0 && !isMine && NETSHIFT_WORLD_BREACH_BUSY === false;
@@ -5458,6 +5607,11 @@ function netshiftWorldConnect() {
 }
 function netshiftWorldDisconnect() {
   if (NETSHIFT_WORLD_SOCKET) { NETSHIFT_WORLD_SOCKET.removeAllListeners(); NETSHIFT_WORLD_SOCKET.disconnect(); NETSHIFT_WORLD_SOCKET = null; }
+  NETSHIFT_WORLD_HOST_INVENTORY_REQUEST += 1;
+  NETSHIFT_WORLD_HOST_INVENTORY_SLUG = null;
+  NETSHIFT_WORLD_HOST_DOWNLOAD_BUSY = false;
+  const hostInventory = $('worldHostInventory');
+  if (hostInventory) { hostInventory.hidden = true; hostInventory.innerHTML = ''; }
   NETSHIFT_WORLD_DATA = {players:[], targets:[], events:[], chat:[]};
   netshiftWorldRenderPlayers([]); netshiftWorldRenderEvents([]); netshiftWorldRenderChat([]);
   netshiftWorldSetConnection("Signed out", false);
@@ -5521,6 +5675,900 @@ async function netshiftWorldBreach() {
   }
 }
 
+async function netshiftWorldLoadHostInventory({quiet = false} = {}) {
+  const select = $('worldTargetSelect'), panel = $('worldHostInventory');
+  if (!panel || !window.NETSHIFT_USER) { if (!quiet) toast('Sign in to access host downloads.'); return; }
+  const slug = select?.value;
+  const target = NETSHIFT_WORLD_DATA.targets.find(item => item.slug === slug);
+  if (!slug || !target || target.compromisedByUsername !== window.NETSHIFT_USER.username) {
+    panel.hidden = true; panel.innerHTML = ''; NETSHIFT_WORLD_HOST_INVENTORY_SLUG = null;
+    if (!quiet) toast('You must control this host before viewing its downloads.');
+    return;
+  }
+  const requestedUserId = window.NETSHIFT_USER.id;
+  const requestId = ++NETSHIFT_WORLD_HOST_INVENTORY_REQUEST;
+  NETSHIFT_WORLD_HOST_INVENTORY_SLUG = slug;
+  panel.hidden = false;
+  panel.innerHTML = '<p>Loading server-owned host inventory…</p>';
+  try {
+    const result = await netshiftApi(`/api/core/hosts/${encodeURIComponent(slug)}/inventory`, {method:'GET'});
+    if (requestId !== NETSHIFT_WORLD_HOST_INVENTORY_REQUEST || $('worldTargetSelect')?.value !== slug || !window.NETSHIFT_USER || window.NETSHIFT_USER.id !== requestedUserId) return;
+    if (!result || result.host?.slug !== slug || !Array.isArray(result.items)) throw new Error('The host returned an invalid inventory response.');
+    const rows = result.items.map(item => {
+      const description = item.type === 'software' ? `Software · ${esc(item.family)} L${Number(item.level)}` : 'File';
+      return `<div class="world-host-item-v13"><div><strong>${esc(item.name)}</strong><small>${description}</small></div><button class="bevel" type="button" data-host-item-id="${esc(item.id)}" ${NETSHIFT_WORLD_HOST_DOWNLOAD_BUSY ? 'disabled' : ''}>Download</button></div>`;
+    }).join('');
+    panel.innerHTML = `<h4>${esc(result.host.name)} — Available downloads</h4><p>These are shared server-stock items. A successful claim adds one canonical record to My Files → Downloads.</p>${rows || '<p>No items are currently available. Refresh later to check for regenerated stock.</p>'}<div style="margin-top:7px"><button class="bevel" type="button" data-refresh-host-stock>Refresh inventory</button></div>`;
+    panel.querySelectorAll('[data-host-item-id]').forEach(button => {
+      button.addEventListener('click', () => netshiftWorldClaimHostItem(slug, button.dataset.hostItemId, button));
+    });
+    panel.querySelector('[data-refresh-host-stock]')?.addEventListener('click', () => netshiftWorldLoadHostInventory());
+  } catch (error) {
+    if (requestId !== NETSHIFT_WORLD_HOST_INVENTORY_REQUEST || !window.NETSHIFT_USER || window.NETSHIFT_USER.id !== requestedUserId) return;
+    panel.innerHTML = `<p>Could not load host inventory: ${esc(error.message)}</p><button class="bevel" type="button" data-retry-host-stock>Retry</button>`;
+    panel.querySelector('[data-retry-host-stock]')?.addEventListener('click', () => netshiftWorldLoadHostInventory());
+    if (!quiet) toast('Host inventory unavailable: ' + error.message);
+    if (error.status === 403 || error.status === 404) await netshiftWorldRefresh();
+  }
+}
+
+async function netshiftWorldClaimHostItem(slug, itemId, button) {
+  if (!window.NETSHIFT_USER || NETSHIFT_WORLD_HOST_DOWNLOAD_BUSY) return;
+  if ($('worldTargetSelect')?.value !== slug) { toast('The selected host changed. Select it again and retry.'); return; }
+  const target = NETSHIFT_WORLD_DATA.targets.find(item => item.slug === slug);
+  if (!target || target.compromisedByUsername !== window.NETSHIFT_USER.username) {
+    toast('You no longer control this host.'); await netshiftWorldRefresh(); return;
+  }
+  NETSHIFT_WORLD_HOST_DOWNLOAD_BUSY = true;
+  if (button) { button.disabled = true; button.textContent = 'Downloading…'; }
+  try {
+    const result = await netshiftApi(`/api/core/hosts/${encodeURIComponent(slug)}/download`, {
+      method:'POST', body: JSON.stringify({itemId})
+    });
+    let inventoryRefreshed = true;
+    try { await netshiftCoreLoadFiles({ quiet: true, required: true }); }
+    catch (_) { inventoryRefreshed = false; }
+    if (inventoryRefreshed) toast(`Downloaded ${result.file?.name || result.item?.name || 'item'} to My Files → Downloads.`);
+    else toast('The download succeeded, but the displayed inventory could not refresh. Reopen My Files or refresh the page.');
+    NETSHIFT_WORLD_HOST_DOWNLOAD_BUSY = false;
+    if ($('worldTargetSelect')?.value === slug) await netshiftWorldLoadHostInventory({quiet:true});
+  } catch (error) {
+    toast(error.message || 'Download failed. Host stock was not consumed unless the server confirmed delivery.');
+    // Re-read stock after conflicts/timeouts. A claimed ID is never retried by inventing
+    // client metadata; the server determines whether the item remains available.
+    NETSHIFT_WORLD_HOST_DOWNLOAD_BUSY = false;
+    if ($('worldTargetSelect')?.value === slug) await netshiftWorldLoadHostInventory({quiet:true});
+    if (error.status === 401) netshiftWorldSetConnection('Sign in required', false);
+  } finally {
+    NETSHIFT_WORLD_HOST_DOWNLOAD_BUSY = false;
+    if (button) { button.disabled = false; button.textContent = 'Download'; }
+  }
+}
+
 if ($("worldTargetSelect")) $("worldTargetSelect").addEventListener("change", netshiftWorldRenderTargetDetails);
+
+
+
+// Core v2 UI: server-confirmed SafetyShield control and Windows-style desktop context menu.
+let NETSHIFT_CORE_PROFILE = null;
+function netshiftValidateCoreProfile(profile) {
+  return !!profile && typeof profile === "object" && !Array.isArray(profile) &&
+    typeof profile.ip === "string" && profile.ip.trim().length > 0 &&
+    typeof profile.safetyShield === "boolean" && typeof profile.bankSetup === "boolean" &&
+    !!profile.bank && typeof profile.bank === "object" && !Array.isArray(profile.bank);
+}
+async function netshiftCoreLoadProfile({ quiet = false, required = false } = {}) {
+  if (!window.NETSHIFT_USER) {
+    if (required) throw new Error("Cannot load a profile without an authenticated account.");
+    return null;
+  }
+  const requestedUserId = window.NETSHIFT_USER.id;
+  const requestedAttempt = NETSHIFT_HYDRATION_ATTEMPT;
+  try {
+    const data = await (required ? netshiftApiWithTimeout('/api/core/profile') : netshiftApi('/api/core/profile'));
+    if (!window.NETSHIFT_USER || window.NETSHIFT_USER.id !== requestedUserId || requestedAttempt !== NETSHIFT_HYDRATION_ATTEMPT) {
+      const stale = new Error("The account session changed while the profile was loading."); stale.code = "HYDRATION_STALE"; throw stale;
+    }
+    if (!netshiftValidateCoreProfile(data?.profile)) throw new Error("The server returned an invalid player profile.");
+    NETSHIFT_CORE_PROFILE = data.profile;
+    if (data.profile.ip) PLAYER_IP = data.profile.ip;
+    return data.profile;
+  } catch (e) {
+    if (!quiet) console.warn('Core profile unavailable:', e.message);
+    if (required) throw e;
+    return null;
+  }
+}
+function netshiftCoreShieldDialog(enabled) {
+  document.getElementById('netshiftShieldDialog')?.remove();
+  const message = enabled
+    ? 'Enabling SafetyShield protects this workstation from player-versus-player attacks. NPC hackers can still target you. You cannot change this setting again for one hour. Continue?'
+    : 'WARNING: Disabling SafetyShield makes this workstation vulnerable to player hacks. You must remain PvP-vulnerable for at least one hour before you can enable SafetyShield again. NPC hackers can still target you. Continue?';
+  const overlay = document.createElement('div'); overlay.id = 'netshiftShieldDialog';
+  overlay.style.cssText='position:fixed;inset:0;background:#0008;z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px';
+  overlay.innerHTML=`<div style="width:min(440px,96vw);background:#c0c0c0;border:3px outset #fff;box-shadow:4px 4px #0007;font:13px Tahoma,Verdana,sans-serif;color:#111"><div style="background:navy;color:white;font-weight:bold;padding:5px 8px">SafetyShield — System Warning</div><div style="padding:16px"><div style="display:flex;gap:12px;align-items:flex-start"><div style="font-size:32px">🛡️</div><p style="margin:0;line-height:1.5">${message}</p></div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px"><button class="bevel" id="netshiftShieldNo">No</button><button class="bevel" id="netshiftShieldYes">Yes</button></div></div></div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('netshiftShieldNo').onclick=()=>overlay.remove();
+  document.getElementById('netshiftShieldYes').onclick=async()=>{overlay.remove();await netshiftCoreSetShield(enabled);};
+}
+async function netshiftCoreSetShield(enabled) {
+  try {
+    const result=await netshiftApi('/api/core/safetyshield',{method:'POST',body:JSON.stringify({enabled})});
+    if(NETSHIFT_CORE_PROFILE) NETSHIFT_CORE_PROFILE.safetyShield=result.safetyShield;
+    toast(result.unchanged?'SafetyShield is already set that way.':`SafetyShield ${result.safetyShield?'enabled':'disabled'}. The one-hour cooldown has started.`);
+    renderComputer();
+  } catch(e) {
+    if(e.data?.remainingMs) toast(`SafetyShield cooldown: ${Math.ceil(e.data.remainingMs/60000)} minute(s) remaining.`);
+    else toast('SafetyShield change failed: '+e.message);
+  }
+}
+function netshiftSafetyShieldIcon(enabled) {
+  const shieldFill = enabled ? '#238b36' : '#c92b2b';
+  const foreground = enabled
+    ? ''
+    : '<path d="M13 13 L27 27 M27 13 L13 27" stroke="#fff" stroke-width="4" stroke-linecap="round"/>';
+  return `<svg role="img" aria-label="SafetyShield ${enabled ? 'enabled' : 'disabled'}" width="34" height="38" viewBox="0 0 40 44" style="flex:none;vertical-align:middle"><path d="M20 3 L35 8 V20 C35 29 28 36 20 41 C12 36 5 29 5 20 V8 Z" fill="${shieldFill}" stroke="#222" stroke-width="2"/>${foreground}</svg>`;
+}
+const netshiftCoreOriginalRenderComputer = renderComputer;
+renderComputer = async function() {
+  const profile = await netshiftCoreLoadProfile();
+  const shieldColour = profile?.safetyShield ? '#238b36' : '#c92323';
+  const shieldIcon = profile ? netshiftSafetyShieldIcon(profile.safetyShield) : '🛡';
+  const shield = profile ? `<div class="box" style="grid-column:1/-1;border:2px solid #777"><h3 style="color:${shieldColour};display:flex;align-items:center;gap:8px">${shieldIcon} SafetyShield</h3><p style="color:${shieldColour};font-weight:bold">${profile.safetyShield?'ON — PvP protected':'OFF — vulnerable to player hacks'}</p><p>NPC hackers can attack regardless of this setting. Changing SafetyShield starts a one-hour cooldown.</p><button class="bevel" onclick="netshiftCoreShieldDialog(${!profile.safetyShield})">Turn SafetyShield ${profile.safetyShield?'OFF':'ON'}…</button><p class="small">Server IP: ${esc(profile.ip)}</p></div>` : `<div class="box" style="grid-column:1/-1"><h3>🛡 SafetyShield</h3><p>Sign in to load your server-managed protection setting.</p></div>`;
+  page(frame(`${titlebar('MY COMPUTER — SYSTEM PROPERTIES')}<div class="cardgrid"><div class="box"><h3>CPU</h3><p>Level ${state.cpu}</p></div><div class="box"><h3>Connection</h3><p>Level ${state.connection}</p></div><div class="box"><h3>Firewall</h3><p>Local Firewall L${state.firewall} — active</p></div><div class="box"><h3>Anti-Malware</h3><p>${state.antimalware?'Installed and active':'Not installed'}</p></div><div class="box"><h3>Virtual IP</h3><p>${esc(profile?.ip || PLAYER_IP)}</p></div><div class="box"><h3>Bank account</h3><p>${profile?.bankSetup && profile?.bank?.accountNumber ? esc(profile.bank.accountNumber) : 'NONE'} · ${profile?.bankSetup ? money(profile.bank.balance) : '—'}</p>${profile?.bankSetup ? '<p class="small">First Bank credentials created</p>' : '<p class="small">First Bank account setup required</p>'}${link('Open First Bank','firstbank.local')}</div>${shield}</div>`),'My Computer');
+};
+function netshiftRenderUserFolders(){
+  const strip=document.getElementById('desktopIcons');if(!strip)return;
+  strip.querySelectorAll('[data-user-folder-v2]').forEach(node=>node.remove());
+  (state.userFoldersV2||[]).forEach(folder=>{const el=document.createElement('div');el.className='deskicon';el.dataset.userFolderV2=folder.name;el.innerHTML='<span>📁</span>'+esc(folder.name);el.title='User-created folder';el.ondblclick=()=>toast('Folder created in the local desktop model. Persistent Explorer integration is part of the next migration step.');el.oncontextmenu=(e)=>{e.preventDefault();toast('Folder: '+folder.name);};strip.appendChild(el);});
+}
+function netshiftDesktopCreate(type) {
+  if (!window.NETSHIFT_USER) { toast('Sign in before creating files.'); return; }
+  netshiftCoreCreateDesktopItem(type).catch(error => toast('Could not create item: ' + error.message));
+}
+document.addEventListener('contextmenu', event=>{
+  const desktop=event.target.closest('#desktopIcons,.desktop,.wallpaper');
+  if(!desktop||event.target.closest('.deskicon,.app-window,.window,.context-menu'))return;
+  event.preventDefault();
+  const menu=document.getElementById('contextMenu');if(!menu)return;
+  menu.innerHTML='<button onclick="netshiftDesktopCreate(\'file\');document.getElementById(\'contextMenu\').classList.add(\'hidden\')">New Text Document</button><button onclick="netshiftDesktopCreate(\'folder\');document.getElementById(\'contextMenu\').classList.add(\'hidden\')">New Folder</button>';
+  menu.style.left=Math.min(event.clientX,window.innerWidth-220)+'px';menu.style.top=Math.min(event.clientY,window.innerHeight-100)+'px';menu.classList.remove('hidden');
+});
+
+
+
+// Core v2 First Bank UI: real player-scoped API; do not use the legacy local demo accounts.
+async function renderBankFront() {
+  state.currentSite = 'bank';
+  const profile = await netshiftCoreLoadProfile();
+  if (!profile) {
+    page(frame(`${titlebar('FIRST BANK ONLINE')}<div class="box"><h3>Sign in required</h3><p>Sign in to NETSHIFT Online before accessing your personal First Bank account.</p></div>`), 'First Bank');
+    return;
+  }
+  if (!profile.bankSetup) {
+    page(frame(`${titlebar('FIRST BANK ONLINE — OPEN YOUR ACCOUNT')}<div class="website-theme-v16" style="background:#edf5fb;color:#193e60;border-color:#a6bfd2"><div class="theme-hero">FIRST BANK ONLINE</div><p>Welcome to First Bank. Create your personal bank credentials to activate your account. This is separate from your NETSHIFT login.</p><p>Your account has a $500 opening balance. Your bank credentials are stored securely by the server.</p></div><div class="admin-panel"><h3>Open your First Bank account</h3><div class="formrow"><label for="coreBankNewUsername">Choose bank username</label><input id="coreBankNewUsername" autocomplete="off" maxlength="40" placeholder="3–40 letters, numbers or underscores"></div><div class="formrow"><label for="coreBankNewPassword">Choose bank password</label><input id="coreBankNewPassword" type="password" autocomplete="new-password" maxlength="128" placeholder="At least 8 characters"></div><p class="small">Choose credentials just for the fictional in-game bank; do not reuse a real password.</p><p><button class="bevel" onclick="netshiftBankCreateAccount()">Create First Bank account</button></p><p id="coreBankMessage" class="account-message" hidden></p></div>`), 'First Bank account setup');
+    return;
+  }
+  try {
+    const data = await netshiftApi('/api/core/bank/account');
+    const a = data.account;
+    page(frame(`${titlebar('FIRST BANK ONLINE — ACCOUNT OVERVIEW')}<div class="website-theme-v16" style="background:#edf5fb;color:#193e60;border-color:#a6bfd2"><div class="theme-hero">FIRST BANK ONLINE</div><p>Account holder: <b>${esc(a.username)}</b></p><p>Account number: <b>${esc(a.accountNumber)}</b></p><div class="bank-balance">${money(a.balance)}<div class="small">Available balance (USD)</div></div></div><div class="box"><h3>Account status</h3><p>Your account and balance are loaded from the server-side player record.</p><p class="software-warning">Bank transfers are not available in this v2 preview yet. Other shop and economy actions may still use legacy local state and are not yet connected to this balance.</p><button class="bevel" onclick="netshiftBankLogout()">Sign out of First Bank</button></div>`), 'First Bank account');
+  } catch (e) {
+    if (e.status === 401 && e.code === 'BANK_AUTH_REQUIRED') {
+      page(frame(`${titlebar('FIRST BANK ONLINE — CUSTOMER LOGIN')}<div class="website-theme-v16" style="background:#edf5fb;color:#193e60;border-color:#a6bfd2"><div class="theme-hero">FIRST BANK ONLINE</div><p>Sign in using your separate First Bank credentials.</p></div><div class="admin-panel"><h3>Customer login</h3><div class="formrow"><label for="coreBankUsername">Bank username</label><input id="coreBankUsername" autocomplete="username" maxlength="40" placeholder="First Bank username"></div><div class="formrow"><label for="coreBankPassword">Bank password</label><input id="coreBankPassword" type="password" autocomplete="current-password" maxlength="128" placeholder="First Bank password"></div><button class="bevel" onclick="netshiftBankLogin()">Secure login</button><p id="coreBankMessage" class="account-message" hidden></p></div>`), 'First Bank customer login');
+      return;
+    }
+    toast('First Bank could not load the account: ' + e.message);
+    page(frame(`${titlebar('FIRST BANK ONLINE — ERROR')}<div class="box"><p>Unable to load the bank account. Please try again.</p><p class="small">${esc(e.message)}</p><button class="bevel" onclick="renderBankFront()">Retry</button></div>`), 'First Bank error');
+  }
+}
+function netshiftBankShowMessage(message) {
+  const el = document.getElementById('coreBankMessage');
+  if (el) { el.textContent = message || ''; el.hidden = !message; }
+  else if (message) toast(message);
+}
+async function netshiftBankCreateAccount() {
+  const username = (document.getElementById('coreBankNewUsername')?.value || '').trim();
+  const password = document.getElementById('coreBankNewPassword')?.value || '';
+  try {
+    const result = await netshiftApi('/api/core/bank/first-login', { method: 'POST', body: JSON.stringify({ username, password }) });
+    await netshiftCoreLoadProfile();
+    toast(result.message || 'First Bank account created. Opening balance: $500.');
+    await renderBankFront();
+  } catch (e) { netshiftBankShowMessage(e.message); }
+}
+async function netshiftBankLogin() {
+  const username = (document.getElementById('coreBankUsername')?.value || '').trim();
+  const password = document.getElementById('coreBankPassword')?.value || '';
+  try {
+    await netshiftApi('/api/core/bank/login', { method: 'POST', body: JSON.stringify({ username, password }) });
+    toast('Signed in to First Bank.');
+    await renderBankFront();
+  } catch (e) { netshiftBankShowMessage(e.message); }
+}
+async function netshiftBankLogout() {
+  try { await netshiftApi('/api/core/bank/logout', { method: 'POST', body: JSON.stringify({}) }); }
+  catch (e) { toast('Bank sign-out failed: ' + e.message); return; }
+  toast('Signed out of First Bank.');
+  await renderBankFront();
+}
+
+
+// Core v2 canonical file/desktop integration. The browser arrays below are mirrors only:
+// each canonical item retains its server record ID, type and parent path so views/actions
+// cannot accidentally substitute a legacy row with the same visible filename.
+let NETSHIFT_CORE_FILES = [];
+let NETSHIFT_CORE_SOFTWARE = [];
+let NETSHIFT_CORE_FOLDERS = [];
+let NETSHIFT_CORE_RECYCLE_FILES = [];
+function netshiftCoreFolderLocation(parentPath) {
+  const path = typeof parentPath === 'string' && parentPath ? parentPath : '/';
+  if (path === '/' || path === '/desktop') return 'desktop';
+  if (path === '/downloads') return 'downloads';
+  if (path === '/archive') return 'archive';
+  return 'custom:' + path;
+}
+function netshiftCoreParentPathForLocation(location) {
+  if (location === 'desktop') return '/';
+  if (location === 'downloads') return '/downloads';
+  if (location === 'archive') return '/archive';
+  if (typeof location === 'string' && location.startsWith('custom:/')) return location.slice(7);
+  return null;
+}
+function netshiftCoreNormaliseSoftwareFamily(family) {
+  const value = String(family || '').trim().toLowerCase().replace(/[ _]+/g, '-');
+  const aliases = {
+    'password-cracker': 'crc', 'passwordcracker': 'crc',
+    'waterwall': 'wwl', 'warez-virus': 'warez',
+    'ftpcash': 'fc', 'ftp-cash': 'fc',
+    'nefarious-uploader': 'uploader', 'file-uploader': 'uploader',
+    'anti-malware': 'av', 'antimalware': 'av'
+  };
+  return aliases[value] || value;
+}
+function netshiftCoreResolveSoftwareId(family, level) {
+  const wantedFamily = netshiftCoreNormaliseSoftwareFamily(family);
+  const wantedLevel = Number(level);
+  if (!wantedFamily || !Number.isInteger(wantedLevel) || wantedLevel < 1 || wantedLevel > 6 || typeof software !== 'object') return null;
+  const found = Object.entries(software).find(([, spec]) => spec &&
+    netshiftCoreNormaliseSoftwareFamily(spec.family) === wantedFamily && Number(spec.level) === wantedLevel);
+  return found ? found[0] : null;
+}
+function netshiftCoreMapFile(row) {
+  return {
+    name: row.name,
+    content: typeof row.content === 'string' ? row.content : '',
+    kind: row.item_type === 'software' ? 'Software' : (row.mime_type || (row.item_type === 'folder' ? 'Folder' : 'Text document')),
+    _coreFileId: row.id,
+    _coreParentPath: row.parent_path || '/',
+    _coreItemType: row.item_type,
+    _coreMimeType: row.mime_type || (row.item_type === 'folder' ? 'inode/directory' : 'text/plain'),
+    _coreSoftwareFamily: row.software_family || null,
+    _coreSoftwareLevel: row.software_level == null ? null : Number(row.software_level),
+    softwareId: row.item_type === 'software' ? netshiftCoreResolveSoftwareId(row.software_family, row.software_level) : null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+function netshiftCoreMapSoftware(row) {
+  const mapped = netshiftCoreMapFile(row);
+  mapped._coreLocation = netshiftCoreFolderLocation(mapped._coreParentPath);
+  return mapped;
+}
+function netshiftCoreLocalFileLocation(file) {
+  if (file?._coreFileId) return netshiftCoreFolderLocation(file._coreParentPath);
+  return state.localFileFolders?.[file?.name] || ((file?.name === 'bank-info.txt') ? 'desktop' : 'downloads');
+}
+function netshiftCoreRecordParentPath(record) {
+  return typeof record?._coreParentPath === 'string' ? record._coreParentPath : '/';
+}
+function netshiftCoreInlineArg(value) {
+  return JSON.stringify(String(value)).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function netshiftCoreUpsertLocalFile(row) {
+  const mapped = netshiftCoreMapFile(row);
+  if (mapped._coreItemType !== 'file') return mapped;
+  state.localFiles = Array.isArray(state.localFiles) ? state.localFiles : [];
+  const index = state.localFiles.findIndex(file => file?._coreFileId === mapped._coreFileId);
+  if (index >= 0) state.localFiles[index] = mapped;
+  else state.localFiles.push(mapped);
+  // Canonical location is stored on the record itself; the legacy filename-keyed
+  // map cannot safely represent duplicate names in different folders.
+  return mapped;
+}
+function netshiftValidateCoreFileRows(rows, label) {
+  if (!Array.isArray(rows)) throw new Error(`The server returned an invalid ${label} list.`);
+  const seen = new Set();
+  for (const row of rows) {
+    if (!row || typeof row !== "object" || Array.isArray(row) ||
+        typeof row.id !== "string" || !row.id.trim() ||
+        typeof row.name !== "string" || !row.name.trim() ||
+        typeof row.parent_path !== "string" ||
+        !["file", "folder", "software"].includes(row.item_type)) {
+      throw new Error(`The server returned an invalid record in the ${label} list.`);
+    }
+    if (seen.has(row.id)) throw new Error(`The server returned a duplicate record in the ${label} list.`);
+    seen.add(row.id);
+  }
+  return rows;
+}
+async function netshiftCoreLoadFiles({ quiet = false, required = false } = {}) {
+  if (!window.NETSHIFT_USER) {
+    if (required) throw new Error("Cannot load inventory without an authenticated account.");
+    return [];
+  }
+  const requestedUserId = window.NETSHIFT_USER.id;
+  const requestedAttempt = NETSHIFT_HYDRATION_ATTEMPT;
+  const previous = {
+    coreFiles: NETSHIFT_CORE_FILES, coreSoftware: NETSHIFT_CORE_SOFTWARE,
+    coreFolders: NETSHIFT_CORE_FOLDERS, recycleFiles: NETSHIFT_CORE_RECYCLE_FILES,
+    localFiles: state.localFiles, localFileFolders: state.localFileFolders,
+    userFoldersV2: state.userFoldersV2, recycleBin: state.recycleBin,
+    owned: state.owned, archiveSoftware: state.archiveSoftware
+  };
+  try {
+    const loadApi = required ? netshiftApiWithTimeout : netshiftApi;
+    const [active, recycled] = await Promise.all([
+      loadApi('/api/core/files'),
+      loadApi('/api/core/files/recycle-bin')
+    ]);
+    if (!window.NETSHIFT_USER || window.NETSHIFT_USER.id !== requestedUserId || requestedAttempt !== NETSHIFT_HYDRATION_ATTEMPT) {
+      const stale = new Error("The account session changed while inventory was loading."); stale.code = "HYDRATION_STALE"; throw stale;
+    }
+    const activeRows = netshiftValidateCoreFileRows(active?.files, "active files");
+    const recycledRows = netshiftValidateCoreFileRows(recycled?.files, "Recycle Bin");
+    const activeIds = new Set(activeRows.map(row => row.id));
+    if (recycledRows.some(row => activeIds.has(row.id))) throw new Error("A canonical file appeared in both active inventory and the Recycle Bin.");
+
+    // Build every view-model before mutating any live mirror. Canonical software and
+    // folders stay in their own typed collections; only actual text/file records enter
+    // state.localFiles. Recycle Bin type is preserved from the server row.
+    let nextLocalFiles = (Array.isArray(state.localFiles) ? state.localFiles : []).filter(file =>
+      !file?._coreFileId && !(window.NETSHIFT_USER && file?.name === 'bank-info.txt') &&
+      !netshiftCoreIsShadowedLegacyFile(file, activeRows));
+    const nextLocalFileFolders = { ...(state.localFileFolders || {}) };
+    let nextFolders = (Array.isArray(state.userFoldersV2) ? state.userFoldersV2 : []).filter(folder => !folder?._coreFolderId);
+    let nextRecycle = (Array.isArray(state.recycleBin) ? state.recycleBin : []).filter(entry => !entry?._coreFileId);
+    const nextSoftware = [];
+    const nextCoreFolders = [];
+    for (const row of activeRows) {
+      if (row.item_type === 'folder') {
+        const folder = { ...netshiftCoreMapFile(row), _coreFolderPath: (row.parent_path || '/') === '/' ? '/' + row.name : (row.parent_path.replace(/\/$/, '') + '/' + row.name) };
+        nextCoreFolders.push(folder);
+        if ((row.parent_path || '/') === '/') nextFolders.push({ ...folder, _coreFolderId: row.id });
+      } else if (row.item_type === 'software') {
+        nextSoftware.push(netshiftCoreMapSoftware(row));
+      } else {
+        const mapped = netshiftCoreMapFile(row);
+        nextLocalFiles.push(mapped);
+      }
+    }
+    for (const row of recycledRows) {
+      const mapped = netshiftCoreMapFile(row);
+      nextRecycle.push({
+        type: row.item_type,
+        id: mapped.softwareId || mapped._coreFileId,
+        item: mapped,
+        folder: netshiftCoreFolderLocation(row.parent_path || '/'),
+        deletedAt: row.recycle_bin_at || row.updated_at || row.created_at,
+        _coreFileId: row.id,
+        _coreItemType: row.item_type
+      });
+    }
+
+    NETSHIFT_CORE_FILES = activeRows;
+    NETSHIFT_CORE_SOFTWARE = nextSoftware;
+    NETSHIFT_CORE_FOLDERS = nextCoreFolders;
+    NETSHIFT_CORE_RECYCLE_FILES = recycledRows;
+    state.localFiles = nextLocalFiles;
+    state.localFileFolders = nextLocalFileFolders;
+    state.userFoldersV2 = nextFolders;
+    state.recycleBin = nextRecycle;
+    // Gameplay code still reads state.owned/archiveSoftware. Keep those arrays as
+    // compatibility mirrors, but rebuild the canonical portion from server rows on
+    // every successful refresh. Unmatched legacy-only entries remain transitional until
+    // Chunk 9 retires the legacy writers; they are never duplicated in canonical views.
+    if (window.NETSHIFT_USER) {
+      const canonicalIds = new Set(nextSoftware.filter(item => item.softwareId).map(item => item.softwareId));
+      const installedIds = nextSoftware.filter(item => ['desktop'].includes(item._coreLocation) && item.softwareId).map(item => item.softwareId);
+      const archivedIds = [...new Set(nextSoftware.filter(item => item._coreLocation === 'archive' && item.softwareId).map(item => item.softwareId))];
+      const legacyOwned = (Array.isArray(state.owned) ? state.owned : []).filter(id => !canonicalIds.has(id));
+      const legacyArchive = (Array.isArray(state.archiveSoftware) ? state.archiveSoftware : []).filter(item => !canonicalIds.has(item?.id));
+      state.owned = [...new Set([...legacyOwned, ...installedIds])];
+      state.archiveSoftware = [...legacyArchive, ...archivedIds.map(id => ({ id, archivedAt: Date.now() }))];
+    }
+    refreshDesktopIcons();
+    refreshExplorerV11();
+    netshiftRenderUserFolders();
+    if (required) NETSHIFT_FILES_READY = true;
+    return NETSHIFT_CORE_FILES;
+  } catch (error) {
+    // A stale response from an old session must not restore its cached mirrors over a
+    // newer account's state. Only the request that still owns the current session may roll back.
+    const stillOwnsSession = !!window.NETSHIFT_USER && window.NETSHIFT_USER.id === requestedUserId && requestedAttempt === NETSHIFT_HYDRATION_ATTEMPT;
+    if (!stillOwnsSession) {
+      if (required) throw error;
+      return [];
+    }
+    // Restore the previous mirror if mapping or rendering fails, so a failed hydration
+    // attempt cannot leave a half-applied inventory masquerading as a successful load.
+    NETSHIFT_CORE_FILES = previous.coreFiles;
+    NETSHIFT_CORE_SOFTWARE = previous.coreSoftware;
+    NETSHIFT_CORE_FOLDERS = previous.coreFolders;
+    NETSHIFT_CORE_RECYCLE_FILES = previous.recycleFiles;
+    state.localFiles = previous.localFiles;
+    state.localFileFolders = previous.localFileFolders;
+    state.userFoldersV2 = previous.userFoldersV2;
+    state.recycleBin = previous.recycleBin;
+    state.owned = previous.owned;
+    state.archiveSoftware = previous.archiveSoftware;
+    if (!quiet) console.warn('Could not synchronise server files:', error.message);
+    if (required) throw error;
+    // An optional refresh failure keeps the last confirmed canonical mirror. Do not
+    // report a synthetic empty inventory merely because the latest request failed.
+    return NETSHIFT_CORE_FILES;
+  }
+}
+function netshiftCoreTakenName(name, parentPath = '/') {
+  // PostgreSQL enforces the active-name constraint across files, folders and software.
+  return NETSHIFT_CORE_FILES.some(file => file.name.toLowerCase() === name.toLowerCase() && file.parent_path === parentPath) ||
+    state.localFiles.some(file => !file?._coreFileId && file.name.toLowerCase() === name.toLowerCase() && (state.localFileFolders?.[file.name] || (file.name === 'bank-info.txt' ? 'desktop' : 'downloads')) === netshiftCoreFolderLocation(parentPath));
+}
+function netshiftCoreUniqueUntitledName(parentPath = '/') {
+  let i = 1;
+  while (i < 10000) {
+    const name = i === 1 ? 'Untitled.txt' : `Untitled (${i}).txt`;
+    if (!netshiftCoreTakenName(name, parentPath)) return name;
+    i += 1;
+  }
+  throw new Error('Could not find an available Untitled filename.');
+}
+async function netshiftCoreCreateDesktopItem(type) {
+  if (type === 'folder') {
+    const base = 'New Folder';
+    let name = base, n = 2;
+    while (NETSHIFT_CORE_FILES.some(file => file.item_type === 'folder' && file.parent_path === '/' && file.name.toLowerCase() === name.toLowerCase()) || (state.userFoldersV2 || []).some(folder => folder.name.toLowerCase() === name.toLowerCase())) {
+      name = `${base} (${n++})`;
+    }
+    const result = await netshiftApi('/api/core/files', { method: 'POST', body: JSON.stringify({ name, type: 'folder', parentPath: '/', content: '' }) });
+    await netshiftCoreLoadFiles({ quiet: true });
+    localLog('Created persistent folder ' + name + '.');
+    toast('Folder created.');
+    return result.file;
+  }
+  if (type !== 'file') return;
+  const name = netshiftCoreUniqueUntitledName('/');
+  const result = await netshiftApi('/api/core/files', { method: 'POST', body: JSON.stringify({ name, type: 'file', parentPath: '/', content: '' }) });
+  await netshiftCoreLoadFiles({ quiet: true });
+  const file = state.localFiles.find(item => item._coreFileId === result.file.id) || netshiftCoreUpsertLocalFile(result.file);
+  localLog('Created persistent text file ' + name + '.');
+  netshiftOpenCoreNotepad(file);
+  return result.file;
+}
+function netshiftOpenCoreNotepad(file) {
+  const current = state.localFiles.find(item => item._coreFileId === file?._coreFileId) || file;
+  if (!current?._coreFileId) { toast('This file is not linked to the server yet.'); return; }
+  const windowId = 'core-notepad-' + current._coreFileId;
+  const safe = windowId.replace(/[^a-zA-Z0-9_-]/g, '-');
+  const contentId = safe + '-text';
+  const nameId = safe + '-name';
+  const statusId = safe + '-status';
+  const body = `<div style="background:#c0c0c0;color:#111;font:12px Tahoma,Verdana,sans-serif;padding:7px;border:2px inset #fff;min-height:260px;display:flex;flex-direction:column;gap:7px">
+    <div style="display:flex;align-items:center;gap:6px"><label for="${nameId}" style="white-space:nowrap">File name:</label><input id="${nameId}" type="text" maxlength="180" value="${esc(current.name)}" style="flex:1;min-width:0;padding:4px;border:2px inset #888;background:#fff;color:#111;font:12px Tahoma,Verdana,sans-serif"></div>
+    <textarea id="${contentId}" spellcheck="false" style="flex:1;min-height:230px;resize:vertical;border:2px inset #888;background:#fff;color:#111;padding:7px;font:13px 'Courier New',monospace">${esc(current.content || '')}</textarea>
+    <div style="display:flex;align-items:center;gap:8px"><button class="bevel" onclick="netshiftCoreSaveNotepad('${current._coreFileId}')">Save</button><button class="bevel" onclick="netshiftCoreReloadNotepad('${current._coreFileId}')">Reload from disk</button><span id="${statusId}" class="small" aria-live="polite">Ready</span></div>
+  </div>`;
+  openAppWindow(windowId, current.name + ' — Notepad', body);
+}
+async function netshiftCoreSaveNotepad(fileId) {
+  const file = state.localFiles.find(item => item._coreFileId === fileId);
+  const windowId = 'core-notepad-' + fileId;
+  const win = appWindows[windowId];
+  const root = win ? document.getElementById(win.rootId) : null;
+  const status = root?.querySelector('[id$="-status"]');
+  const nameInput = root?.querySelector('input[id$="-name"]');
+  const textInput = root?.querySelector('textarea[id$="-text"]');
+  if (!file || !nameInput || !textInput) { toast('Notepad window is no longer available.'); return; }
+  const name = nameInput.value.trim();
+  if (!name || name.length > 180 || /[\\/\0]/.test(name) || name === '.' || name === '..') { if (status) status.textContent = 'Invalid filename'; return; }
+  if (status) status.textContent = 'Saving…';
+  try {
+    const result = await netshiftApi('/api/core/files/' + encodeURIComponent(fileId), { method: 'PUT', body: JSON.stringify({ name, content: textInput.value, parentPath: file._coreParentPath || '/' }) });
+    Object.assign(file, netshiftCoreMapFile(result.file));
+    const title = root.querySelector('.app-titlebar span');
+    if (title) title.textContent = name + ' — Notepad';
+    if (win) win.title = name + ' — Notepad';
+    if (status) status.textContent = 'Saved to NETSHIFT disk';
+    await netshiftCoreLoadFiles({ quiet: true });
+    toast('File saved.');
+  } catch (error) {
+    if (status) status.textContent = 'Save failed: ' + error.message;
+    if (error.status === 409) toast('That filename is already in use in this folder. Choose another name.');
+    else toast('Could not save file: ' + error.message);
+  }
+}
+async function netshiftCoreReloadNotepad(fileId) {
+  await netshiftCoreLoadFiles({ quiet: true });
+  const file = state.localFiles.find(item => item._coreFileId === fileId);
+  if (!file) { toast('This file could not be found on the server.'); return; }
+  netshiftOpenCoreNotepad(file);
+}
+function netshiftCoreFindLocalFile(key) {
+  return state.localFiles.find(item => item._coreFileId === key || item.name === key);
+}
+// Replace legacy open behaviour only for files that have a canonical server ID.
+var netshiftLegacyOpenLocalFileV11 = openLocalFileV11;
+openLocalFileV11 = function(file) {
+  if (file?._coreFileId && file._coreItemType === 'file') { netshiftOpenCoreNotepad(file); return; }
+  return netshiftLegacyOpenLocalFileV11(file);
+};
+var netshiftLegacyRenderUserFolders = netshiftRenderUserFolders;
+netshiftRenderUserFolders = function() {
+  const strip = document.getElementById('desktopIcons');
+  if (!strip) return;
+  strip.querySelectorAll('[data-user-folder-v2]').forEach(node => node.remove());
+  (state.userFoldersV2 || []).forEach(folder => {
+    const el = document.createElement('div'); el.className = 'deskicon'; el.dataset.userFolderV2 = folder.name;
+    el.innerHTML = '<span>📁</span>' + esc(folder.name); el.title = 'User folder';
+    el.ondblclick = () => openExplorerWindow(folder._coreFolderPath ? 'custom:' + folder.name : 'desktop');
+    el.oncontextmenu = event => { event.preventDefault(); showContextMenu(event, 'userFolder', '', folder.name); };
+    strip.appendChild(el);
+  });
+};
+var netshiftLegacyOpenExplorerWindow = openExplorerWindow;
+openExplorerWindow = function(folder = 'desktop') {
+  state.explorerFolderV16 = folder;
+  const windowRef = netshiftLegacyOpenExplorerWindow(folder);
+  const id = 'explorer-' + state.explorerSerialV16;
+  if (windowRef) {
+    windowRef.folder = folder;
+    state.activeExplorerWindowV16 = id;
+    state.explorerFolderV16 = folder;
+    const body = document.getElementById(windowRef.bodyId);
+    if (body) body.innerHTML = renderExplorerContent();
+  }
+  return windowRef;
+};
+var netshiftLegacyRenderExplorerContent = renderExplorerContent;
+renderExplorerContent = function() {
+  const win = appWindows[state.activeExplorerWindowV16];
+  const folder = win?.folder || state.explorerFolderV16 || 'desktop';
+  if (!folder.startsWith('custom:')) return netshiftLegacyRenderExplorerContent();
+  const folderName = folder.slice('custom:'.length);
+  const folderPath = '/' + folderName;
+  const files = state.localFiles.filter(file => file._coreFileId && file._coreParentPath === folderPath).map(renderLocalFileRowV16).join('');
+  const subfolders = (state.userFoldersV2 || []).filter(item => item._coreFolderPath?.startsWith(folderPath + '/') ).map(item => `<div class="explorer-row"><div class="fileicon">📁</div><div class="fileinfo"><strong>${esc(item.name)}</strong><small>Folder</small></div></div>`).join('');
+  return `<div class="box"><h3>Windows Explorer — ${esc(folderName)}</h3><p class="small muted">This folder is server-backed. Right-click files to open, edit or move them to the Recycle Bin.</p><div class="file-drop-target-v16" ondragover="event.preventDefault()" ondrop="event.preventDefault();dropOnFolderV16(event,'custom:${esc(folderName)}')">Drop items here to move into ${esc(folderName)}</div><div class="file-list">${files || subfolders || '<p>This folder is empty.</p>'}</div></div>`;
+};
+var netshiftLegacyDropOnFolderV16 = dropOnFolderV16;
+dropOnFolderV16 = function(event, folder) {
+  const payload = state.dragPayloadV16;
+  if (payload?.type === 'localFile') {
+    const file = state.localFiles.find(item => item.name === payload.name);
+    if (file?._coreFileId) {
+      event.preventDefault();
+      (async () => {
+        try {
+          if (folder === 'recycle') {
+            await netshiftApi('/api/core/files/' + encodeURIComponent(file._coreFileId), { method: 'DELETE' });
+          } else {
+            const parentPath = folder === 'desktop' ? '/' : folder === 'downloads' ? '/downloads' : folder === 'archive' ? '/archive' : folder.startsWith('custom:') ? '/' + folder.slice(7) : null;
+            if (!parentPath) throw new Error('Unknown destination folder.');
+            await netshiftApi('/api/core/files/' + encodeURIComponent(file._coreFileId), { method: 'PUT', body: JSON.stringify({ content: file.content || '', name: file.name, parentPath }) });
+          }
+          state.dragPayloadV16 = null;
+          await netshiftCoreLoadFiles({ quiet: true });
+          toast(folder === 'recycle' ? 'Moved to Recycle Bin.' : 'File moved to ' + folder + '.');
+        } catch (error) { toast('Move failed: ' + error.message); }
+      })();
+      return;
+    }
+  }
+  return netshiftLegacyDropOnFolderV16(event, folder);
+};
+var netshiftLegacyContextAction = contextAction;
+contextAction = function(action, type, site, key) {
+  if (type === 'localFile') {
+    const file = state.localFiles.find(item => item.name === key);
+    if (file?._coreFileId && action === 'delete') {
+      $('contextMenu')?.classList.add('hidden');
+      netshiftApi('/api/core/files/' + encodeURIComponent(file._coreFileId), { method: 'DELETE' })
+        .then(async () => { await netshiftCoreLoadFiles({ quiet: true }); toast('Moved to Recycle Bin.'); })
+        .catch(error => toast('Delete failed: ' + error.message));
+      return;
+    }
+    if (file?._coreFileId && action === 'open') { $('contextMenu')?.classList.add('hidden'); netshiftOpenCoreNotepad(file); return; }
+  }
+  return netshiftLegacyContextAction(action, type, site, key);
+};
+var netshiftLegacyRestoreRecycleV16 = restoreRecycleV16;
+restoreRecycleV16 = function(index) {
+  const entry = state.recycleBin[index];
+  if (entry?._coreFileId) {
+    netshiftApi('/api/core/files/' + encodeURIComponent(entry._coreFileId) + '/restore', { method: 'POST', body: '{}' })
+      .then(async () => { await netshiftCoreLoadFiles({ quiet: true }); toast('Item restored.'); })
+      .catch(error => toast('Restore failed: ' + error.message));
+    return;
+  }
+  return netshiftLegacyRestoreRecycleV16(index);
+};
+var netshiftLegacyPermanentlyDeleteRecycleV16 = permanentlyDeleteRecycleV16;
+permanentlyDeleteRecycleV16 = function(index) {
+  const entry = state.recycleBin[index];
+  if (entry?._coreFileId) {
+    netshiftApi('/api/core/files/' + encodeURIComponent(entry._coreFileId) + '/permanent', { method: 'DELETE' })
+      .then(async () => { await netshiftCoreLoadFiles({ quiet: true }); toast('Item permanently deleted.'); })
+      .catch(error => toast('Permanent delete failed: ' + error.message));
+    return;
+  }
+  return netshiftLegacyPermanentlyDeleteRecycleV16(index);
+};
+// Stage 1 Chunk 7: render canonical inventory from server record IDs, not filename-keyed
+// legacy mirrors. These wrappers deliberately keep legacy-only records visible during the
+// staged migration while preventing a canonical row from being shown twice.
+function netshiftCorePathMatchesLocation(parentPath, location) {
+  return netshiftCoreFolderLocation(parentPath) === location;
+}
+function netshiftCoreSoftwareAt(location) {
+  return NETSHIFT_CORE_SOFTWARE.filter(item => item._coreLocation === location);
+}
+function netshiftCoreSoftwareRowsForView(location) {
+  const canonical = netshiftCoreSoftwareAt(location);
+  const canonicalIds = new Set(NETSHIFT_CORE_SOFTWARE.map(item => item.softwareId).filter(Boolean));
+  if (!window.NETSHIFT_USER && location === 'desktop') {
+    return canonical;
+  }
+  const legacyIds = location === 'desktop'
+    ? (state.owned || []).filter(id => !canonicalIds.has(id)).map(id => ({ id, softwareId: id, _legacySoftware: true }))
+    : location === 'archive'
+      ? (state.archiveSoftware || []).filter(item => !canonicalIds.has(item?.id)).map(item => ({ id: item.id, softwareId: item.id, _legacySoftware: true }))
+      : [];
+  return [...canonical, ...legacyIds];
+}
+function netshiftCoreRenderSoftwareRow(item, location) {
+  const id = item.softwareId;
+  const spec = id ? software[id] : null;
+  const label = item.name || (spec ? spec.name + spec.ext : 'Unknown software');
+  const icon = spec?.icon || '🧩';
+  const level = item._coreSoftwareLevel ?? spec?.level ?? 'unknown';
+  const kindLabel = item._legacySoftware ? 'Temporary local copy' : 'Server-owned software';
+  const recordId = item._legacySoftware ? '' : item._coreFileId;
+  const canRun = !!spec && location === 'desktop';
+  // Only Desktop represents installed/runnable software. Archive and Downloads are
+  // storage locations; double-clicking a known or unknown canonical row requests install.
+  const doubleClick = canRun
+    ? `runSoftware(${netshiftCoreInlineArg(id)})`
+    : (!item._legacySoftware && location !== 'desktop' ? `netshiftCoreItemAction('install',${netshiftCoreInlineArg(recordId)})` : `toast('This software family or version is not recognised by the local application catalogue.')`);
+  const locationLabel = location === 'archive' ? 'archived' : location === 'downloads' ? 'downloaded' : location === 'desktop' ? 'installed' : 'in folder';
+  if (item._legacySoftware) {
+    return renderSoftwareRowV16(item.softwareId, location === 'archive');
+  }
+  return `<div class="explorer-row" draggable="true" data-core-record-id="${esc(recordId)}" data-core-item-type="software" ${id ? `data-software-id="${esc(id)}"` : ''} ondragstart="netshiftCoreDragStart(event,'software',${netshiftCoreInlineArg(recordId)})" ondblclick="${doubleClick}" oncontextmenu="netshiftCoreShowItemMenu(event,${netshiftCoreInlineArg(recordId)})"><div class="fileicon">${icon}</div><div class="fileinfo"><strong>${esc(label)}</strong><small>${kindLabel} · ${esc(String(level))} · ${locationLabel}${!spec ? ' · catalogue mapping unavailable' : ''}</small></div></div>`;
+}
+function netshiftCoreRenderFolderRow(folder) {
+  const recordId = folder._coreFileId;
+  const childPath = folder._coreFolderPath || (netshiftCoreRecordParentPath(folder).replace(/\/$/, '') + '/' + folder.name);
+  return `<div class="explorer-row" draggable="true" data-core-record-id="${esc(recordId)}" data-core-item-type="folder" ondblclick="openExplorerWindow(${netshiftCoreInlineArg('custom:' + childPath)})" oncontextmenu="netshiftCoreShowFolderMenu(event,${netshiftCoreInlineArg(recordId)})"><div class="fileicon">📁</div><div class="fileinfo"><strong>${esc(folder.name)}</strong><small>Server-owned folder · ${esc(folder._coreParentPath || '/')}</small></div></div>`;
+}
+function netshiftCoreShowItemMenu(event, recordId) {
+  event.preventDefault(); event.stopPropagation();
+  const item = NETSHIFT_CORE_FILES.find(row => row.id === recordId);
+  if (!item) { toast('This server item is no longer in the current inventory. Refresh and try again.'); return; }
+  const mapped = netshiftCoreMapFile(item);
+  const location = netshiftCoreFolderLocation(mapped._coreParentPath);
+  const key = netshiftCoreInlineArg(recordId);
+  let actions = '';
+  if (item.item_type === 'file') {
+    actions = `<button onclick="netshiftCoreItemAction('open',${key})">Open</button><hr><button onclick="netshiftCoreItemAction('move-desktop',${key})">Move to Desktop</button><button onclick="netshiftCoreItemAction('move-downloads',${key})">Move to Downloads</button><button onclick="netshiftCoreItemAction('move-archive',${key})">Move to Archive</button><button onclick="netshiftCoreItemAction('delete',${key})">Move to Recycle Bin</button>`;
+  } else if (item.item_type === 'software') {
+    actions = `${mapped.softwareId && location === 'desktop' ? `<button onclick="netshiftCoreItemAction('run',${key})">Open / Run</button>` : ''}${location !== 'desktop' ? `<button onclick="netshiftCoreItemAction('install',${key})">Install / Move to Desktop</button>` : ''}${location !== 'archive' ? `<button onclick="netshiftCoreItemAction('move-archive',${key})">Move to Archive</button>` : ''}<hr><button onclick="netshiftCoreItemAction('delete',${key})">Move to Recycle Bin</button>`;
+  } else {
+    const folderPath = (mapped._coreParentPath.replace(/\/$/, '') + '/' + mapped.name) || '/' + mapped.name;
+    actions = `<button onclick="openExplorerWindow(${netshiftCoreInlineArg('custom:' + folderPath)});document.getElementById('contextMenu').classList.add('hidden')">Open folder</button>`;
+  }
+  const menu = $('contextMenu'); if (!menu) return;
+  menu.innerHTML = actions;
+  menu.style.left = Math.min(event.clientX, window.innerWidth - 220) + 'px';
+  menu.style.top = Math.min(event.clientY, window.innerHeight - 230) + 'px';
+  menu.classList.remove('hidden');
+}
+function netshiftCoreShowFolderMenu(event, recordId) {
+  netshiftCoreShowItemMenu(event, recordId);
+}
+function netshiftCoreDragStart(event, itemType, recordId) {
+  state.dragPayloadV16 = { type: itemType === 'software' ? 'coreSoftware' : itemType === 'file' ? 'coreFile' : 'coreFolder', id: recordId };
+  event.dataTransfer?.setData('text/plain', JSON.stringify(state.dragPayloadV16));
+}
+async function netshiftCoreItemAction(action, recordId, explicitParentPath = null) {
+  const item = NETSHIFT_CORE_FILES.find(row => row.id === recordId);
+  if (!item) { toast('This server item is no longer available. Refresh the inventory and try again.'); return; }
+  const mapped = netshiftCoreMapFile(item);
+  if (action === 'run') {
+    if (!mapped.softwareId) { toast('This software family or version is not recognised by the local application catalogue.'); return; }
+    runSoftware(mapped.softwareId); return;
+  }
+  if (action === 'open') {
+    if (item.item_type !== 'file') { toast('This item cannot be opened as a text document.'); return; }
+    const file = state.localFiles.find(candidate => candidate._coreFileId === recordId);
+    if (!file) { toast('The file is not present in the current canonical mirror. Refresh and try again.'); return; }
+    netshiftOpenCoreNotepad(file); return;
+  }
+  if (item.item_type === 'folder') { toast('Moving or deleting folders is disabled until child-path handling is implemented safely.'); return; }
+  try {
+    if (action === 'delete') {
+      await netshiftApi('/api/core/files/' + encodeURIComponent(recordId), { method: 'DELETE' });
+      await netshiftCoreLoadFiles({ quiet: true });
+      toast('Item moved to Recycle Bin.'); return;
+    }
+    const targetPath = explicitParentPath || (action === 'install' || action === 'move-desktop' ? '/desktop'
+      : action === 'move-downloads' ? '/downloads'
+      : action === 'move-archive' ? '/archive' : null);
+    if (!targetPath) return;
+    if (item.item_type === 'software') {
+      const result = await netshiftApi('/api/core/files/' + encodeURIComponent(recordId) + '/location', { method: 'PATCH', body: JSON.stringify({ parentPath: targetPath }) });
+      await netshiftCoreLoadFiles({ quiet: true });
+      toast(result.message || (targetPath === '/desktop' || targetPath === '/' ? 'Software installed on Desktop.' : 'Software moved to ' + netshiftCoreFolderLocation(targetPath) + '.'));
+      return;
+    }
+    if (item.item_type === 'file') {
+      await netshiftApi('/api/core/files/' + encodeURIComponent(recordId), { method: 'PUT', body: JSON.stringify({ content: mapped.content || '', name: mapped.name, parentPath: targetPath }) });
+      await netshiftCoreLoadFiles({ quiet: true });
+      toast('File moved to ' + netshiftCoreFolderLocation(targetPath) + '.');
+    }
+  } catch (error) { toast('Inventory action failed: ' + error.message); }
+}
+function netshiftCoreEffectiveFileLocation(file) { return netshiftCoreLocalFileLocation(file); }
+function netshiftCoreIsShadowedLegacyFile(file, canonicalRows = NETSHIFT_CORE_FILES) {
+  if (!file || file._coreFileId) return false;
+  // The legacy bank-info.txt was a tutorial/demo file containing fictional credentials.
+  // The approved save cutover discards it for authenticated accounts, but must not hide
+  // a legitimate canonical server-owned file with that same filename.
+  if (window.NETSHIFT_USER && file.name === 'bank-info.txt') return true;
+  const location = netshiftCoreEffectiveFileLocation(file);
+  return (Array.isArray(canonicalRows) ? canonicalRows : []).some(row => {
+    if (!row || row.item_type !== 'file' || row.name !== file.name) return false;
+    return netshiftCoreFolderLocation(row.parent_path || '/') === location;
+  });
+}
+function renderLocalFileRowV16(file) {
+  const location = netshiftCoreEffectiveFileLocation(file);
+  const status = file.quarantined ? 'QUARANTINED' : file.infection ? 'SCAN RECOMMENDED' : '';
+  if (file?._coreFileId) {
+    const id = JSON.stringify(file._coreFileId).replace(/</g, '\u003c');
+    return `<div class="explorer-row" draggable="true" data-core-record-id="${esc(file._coreFileId)}" data-core-item-type="file" ondragstart="netshiftCoreDragStart(event,'file',${netshiftCoreInlineArg(file._coreFileId)})" ondblclick="netshiftCoreItemAction('open',${netshiftCoreInlineArg(file._coreFileId)})" oncontextmenu="netshiftCoreShowItemMenu(event,${netshiftCoreInlineArg(file._coreFileId)})"><div class="fileicon">📄</div><div class="fileinfo"><strong>${esc(file.name)}</strong><small>Server-owned file · ${esc(location)}${status ? ' · ' + status : ''}</small></div></div>`;
+  }
+  return `<div class="explorer-row ${file.quarantined ? 'quarantined' : ''}" draggable="true" data-local-file="${esc(file.name)}" ondblclick="openLocalFileByNameV11(${JSON.stringify(file.name).replace(/"/g, '&quot;')})" oncontextmenu="showContextMenu(event,'localFile','',${JSON.stringify(file.name).replace(/"/g, '&quot;')})"><div class="fileicon">${file.quarantined ? '🚫' : '📄'}</div><div class="fileinfo"><strong>${esc(file.name)}</strong><small>${esc(file.kind || 'File')} · ${status || location}</small></div></div>`;
+}
+function refreshDesktopIcons() {
+  const root = $('softwareIcons'); if (!root) return;
+  // The hard-coded icon belongs to the discarded tutorial/demo save, not a canonical
+  // file row. Authenticated canonical files are rendered below using their server IDs.
+  if (window.NETSHIFT_USER) document.getElementById('legacyBankInfoIcon')?.remove();
+  const desktopFiles = (state.localFiles || []).filter(file => !netshiftCoreIsShadowedLegacyFile(file) && netshiftCoreEffectiveFileLocation(file) === 'desktop')
+    .map(file => file?._coreFileId ? netshiftCoreRenderDesktopFile(file) : netshiftCoreRenderLegacyDesktopFile(file)).join('');
+  const canonicalSoftware = netshiftCoreSoftwareRowsForView('desktop').map(item => item._legacySoftware
+    ? `<div class="software-deskicon" title="Open ${esc(software[item.softwareId]?.name || item.softwareId)}" onclick="runSoftware(${JSON.stringify(item.softwareId)})"><span>${software[item.softwareId]?.icon || '🧩'}</span>${esc(software[item.softwareId]?.name || item.softwareId)}<small style="display:block;font-size:9px;text-shadow:none">${esc(software[item.softwareId]?.ext || '')}</small></div>`
+    : `<div class="software-deskicon" draggable="true" data-core-record-id="${esc(item._coreFileId)}" data-core-item-type="software" ${item.softwareId ? `data-software-id="${esc(item.softwareId)}"` : ''} title="${esc(item.name)}" ondragstart="netshiftCoreDragStart(event,'software',${netshiftCoreInlineArg(item._coreFileId)})" onclick="${item.softwareId ? `runSoftware(${netshiftCoreInlineArg(item.softwareId)})` : `toast('This software family or version is not recognised by the local application catalogue.')`}" oncontextmenu="netshiftCoreShowItemMenu(event,${netshiftCoreInlineArg(item._coreFileId)})"><span>${software[item.softwareId]?.icon || '🧩'}</span>${esc(software[item.softwareId]?.name || item.name)}<small style="display:block;font-size:9px;text-shadow:none">${esc(software[item.softwareId]?.ext || '')}</small></div>`).join('');
+  root.innerHTML = desktopFiles + canonicalSoftware;
+}
+function netshiftCoreRenderDesktopFile(file) {
+  const id = JSON.stringify(file._coreFileId).replace(/</g, '\u003c');
+  return `<div class="deskicon" draggable="true" data-core-record-id="${esc(file._coreFileId)}" data-core-item-type="file" ondragstart="netshiftCoreDragStart(event,'file',${netshiftCoreInlineArg(file._coreFileId)})" ondblclick="netshiftCoreItemAction('open',${netshiftCoreInlineArg(file._coreFileId)})" oncontextmenu="netshiftCoreShowItemMenu(event,${netshiftCoreInlineArg(file._coreFileId)})"><span>📄</span>${esc(file.name)}</div>`;
+}
+function netshiftCoreRenderLegacyDesktopFile(file) {
+  return `<div class="deskicon" draggable="true" data-local-file="${esc(file.name)}" ondblclick="openLocalFileByNameV11(${JSON.stringify(file.name).replace(/"/g, '&quot;')})" oncontextmenu="showContextMenu(event,'localFile','',${JSON.stringify(file.name).replace(/"/g, '&quot;')})"><span>${file.quarantined ? '🚫' : '📄'}</span>${esc(file.name)}</div>`;
+}
+// Recycle Bin mirrors the authoritative item type and filename. Unknown software
+// families stay visible by their stored canonical name rather than exposing a UUID.
+renderRecycleRowV16 = function renderRecycleRowV16(entry, index) {
+  const item = entry?.item || {};
+  const itemType = entry?._coreItemType || item?._coreItemType || entry?.type || 'file';
+  const spec = itemType === 'software' ? software[entry?.id] : null;
+  const label = item.name || (spec ? spec.name + (spec.ext || '') : (itemType === 'software' && entry?.id ? String(entry.id) : 'Deleted item'));
+  const typeLabel = itemType === 'software' ? 'Software' : itemType === 'folder' ? 'Folder' : 'File';
+  const icon = itemType === 'software' ? '🧩' : itemType === 'folder' ? '📁' : '📄';
+  const deletedAt = entry?.deletedAt ? new Date(entry.deletedAt).toLocaleString() : 'unknown time';
+  return `<div class="explorer-row" data-core-record-id="${entry?._coreFileId ? esc(entry._coreFileId) : ''}" data-core-item-type="${esc(itemType)}" oncontextmenu="showContextMenu(event,'recycleFile','',${Number(index) || 0})"><div class="fileicon recycle-bin-icon">${icon}</div><div class="fileinfo"><strong>${esc(label)}</strong><small>${typeLabel} · Deleted ${esc(deletedAt)}</small></div>${button('Restore', 'restoreRecycleV16(' + (Number(index) || 0) + ')')} ${button('Delete forever', 'permanentlyDeleteRecycleV16(' + (Number(index) || 0) + ')')}</div>`;
+};
+
+renderExplorerContent = function renderExplorerContent() {
+  const active = appWindows[state.activeExplorerWindowV16];
+  const folder = active?.folder || state.explorerFolderV16 || 'desktop';
+  const tabs = [['desktop','Desktop'],['downloads','Downloads'],['archive','Archive'],['recycle','Recycle Bin']];
+  const heading = tabs.find(([key]) => key === folder)?.[1] || (folder.startsWith('custom:') ? folder.slice(7) : 'Desktop');
+  let content = '';
+  if (folder === 'recycle') {
+    content = (state.recycleBin || []).map((entry, index) => renderRecycleRowV16(entry,index)).join('');
+  } else {
+    const parentPath = netshiftCoreParentPathForLocation(folder);
+    const localFiles = (state.localFiles || []).filter(file => !netshiftCoreIsShadowedLegacyFile(file) && netshiftCoreEffectiveFileLocation(file) === folder && (!folder.startsWith('custom:') || netshiftCoreRecordParentPath(file) === parentPath));
+    content += localFiles.map(renderLocalFileRowV16).join('');
+    if (folder === 'desktop') {
+      content += netshiftCoreSoftwareRowsForView('desktop').map(item => item._legacySoftware ? renderSoftwareRowV16(item.softwareId,false) : netshiftCoreRenderSoftwareRow(item,folder)).join('');
+      content += NETSHIFT_CORE_FOLDERS.filter(item => (item._coreParentPath || '/') === '/').map(netshiftCoreRenderFolderRow).join('');
+      content += (state.userFoldersV2 || []).filter(item => !item?._coreFolderId).map(item => `<div class="explorer-row"><div class="fileicon">📁</div><div class="fileinfo"><strong>${esc(item.name)}</strong><small>Temporary local folder</small></div></div>`).join('');
+    } else if (folder === 'downloads') {
+      content += netshiftCoreSoftwareAt('downloads').map(item => netshiftCoreRenderSoftwareRow(item,folder)).join('');
+    } else if (folder === 'archive') {
+      const archivedFiles = (state.localFiles || []).filter(file => netshiftCoreEffectiveFileLocation(file) === 'archive');
+      // localFiles content is already filtered above; only append archived software and legacy archive items.
+      content += netshiftCoreSoftwareAt('archive').map(item => netshiftCoreRenderSoftwareRow(item,folder)).join('');
+      content += (state.archiveSoftware || []).filter(item => !item?._coreFileId && !NETSHIFT_CORE_SOFTWARE.some(core => core.softwareId === item?.id)).map(item => renderSoftwareRowV16(item.id,true)).join('');
+    } else if (folder.startsWith('custom:')) {
+      content += NETSHIFT_CORE_SOFTWARE.filter(item => item._coreParentPath === parentPath).map(item => netshiftCoreRenderSoftwareRow(item,folder)).join('');
+      content += NETSHIFT_CORE_FOLDERS.filter(item => item._coreParentPath === parentPath).map(netshiftCoreRenderFolderRow).join('');
+    }
+    // Legacy software items are transitional and shown only when no canonical row for
+    // that software exists; this avoids presenting two copies of the same ownership.
+    if (folder === 'desktop' && !window.NETSHIFT_USER) {
+      content += (state.owned || []).map(id => renderSoftwareRowV16(id,false)).join('');
+    }
+  }
+  if (!content) content = '<p>This folder is empty.</p>';
+  const tabButtons = tabs.map(([key,label]) => `<button class="tab ${folder===key?'active':''}" ondragover="event.preventDefault()" ondrop="event.preventDefault();dropOnFolderV16(event,${netshiftCoreInlineArg(key)})" onclick="setExplorerFolderV16(${netshiftCoreInlineArg(key)})">${label}</button>`).join('');
+  return `<div class="box"><h3>Windows Explorer — ${esc(heading)}</h3><p class="small muted">Right-click items for actions. Drag them to another folder tab to move them.</p><div class="explorer-folder-tabs-v16">${tabButtons}</div><div class="file-drop-target-v16" ondragover="event.preventDefault()" ondrop="event.preventDefault();dropOnFolderV16(event,${netshiftCoreInlineArg(folder)})">Drop items here to move into ${esc(heading)}</div><div class="file-list">${content}</div></div>`;
+};
+netshiftRenderUserFolders = function netshiftRenderUserFolders() {
+  const strip = document.getElementById('desktopIcons'); if (!strip) return;
+  strip.querySelectorAll('[data-user-folder-v2]').forEach(node => node.remove());
+  (state.userFoldersV2 || []).forEach(folder => {
+    const el = document.createElement('div'); el.className = 'deskicon'; el.dataset.userFolderV2 = folder.name;
+    el.innerHTML = '<span>📁</span>' + esc(folder.name); el.title = folder._coreFolderId ? 'Server-owned folder' : 'Temporary local folder';
+    if (folder._coreFolderId) el.ondblclick = () => openExplorerWindow('custom:' + (folder._coreFolderPath || ('/' + folder.name)));
+    else el.ondblclick = () => toast('This folder is still local-only and will be reconciled in the remaining legacy inventory work.');
+    el.oncontextmenu = event => { event.preventDefault(); if (folder._coreFolderId) netshiftCoreShowFolderMenu(event, folder._coreFolderId); else toast('This folder is temporary local state.'); };
+    strip.appendChild(el);
+  });
+};
+var netshiftCorePreviousDropOnFolderV16 = dropOnFolderV16;
+dropOnFolderV16 = function(event, folder) {
+  event.preventDefault();
+  const payload = state.dragPayloadV16;
+  if (!payload || !['coreFile','coreSoftware','coreFolder'].includes(payload.type)) return netshiftCorePreviousDropOnFolderV16(event, folder);
+  if (payload.type === 'coreFolder') { toast('Moving folders is disabled until child-path updates can be made atomically.'); return; }
+  const targetPath = folder === 'recycle' ? null : netshiftCoreParentPathForLocation(folder);
+  if (folder !== 'recycle' && !targetPath) { toast('Unknown destination folder.'); return; }
+  netshiftCoreItemAction(folder === 'recycle' ? 'delete' : 'move-location', payload.id, targetPath);
+  state.dragPayloadV16 = null;
+};
+var netshiftCorePreviousContextAction = contextAction;
+contextAction = function(action, type, site, key) {
+  if (type === 'coreFile' || type === 'coreSoftware' || type === 'coreFolder') {
+    const record = NETSHIFT_CORE_FILES.find(item => item.id === key);
+    if (!record) { toast('This server item is no longer available.'); return; }
+    if (type === 'coreFolder') { netshiftCoreShowItemMenu({ preventDefault(){}, stopPropagation(){}, clientX:10, clientY:10 }, key); return; }
+    if (type === 'coreFile' && action === 'open') { netshiftCoreItemAction('open', key); return; }
+    if (action === 'delete') { netshiftCoreItemAction('delete', key); return; }
+    if (action === 'restore') { netshiftCoreItemAction('install', key); return; }
+  }
+  return netshiftCorePreviousContextAction(action, type, site, key);
+};
+
+// A force-connect attempt is possible only after a password-verified login found that
+// the incumbent has no reachable live socket. The server re-checks this before takeover.
+async function netshiftForceConnect() {
+  const button = $('forceConnectButton');
+  if (!button || button.disabled) return;
+  const accepted = await new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:#0008;z-index:100010;display:flex;align-items:center;justify-content:center;padding:16px';
+    overlay.innerHTML = `<div role="alertdialog" aria-modal="true" style="width:min(440px,96vw);background:#c0c0c0;border:3px outset #fff;box-shadow:4px 4px #0007;font:13px Tahoma,Verdana,sans-serif;color:#111"><div style="background:navy;color:#fff;font-weight:bold;padding:5px 8px">NETSHIFT — Force Connect</div><div style="padding:16px"><p>The previous session could not be reached. Force Connect will take over account control and revoke the previous session if it is still unreachable. Any unsaved progress in that session may be lost.</p><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px"><button class="bevel" id="forceConnectCancel">Cancel</button><button class="bevel" id="forceConnectConfirm">Force Connect</button></div></div></div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#forceConnectCancel').onclick = () => { overlay.remove(); resolve(false); };
+    overlay.querySelector('#forceConnectConfirm').onclick = () => { overlay.remove(); resolve(true); };
+  });
+  if (!accepted) return;
+  button.disabled = true;
+  netshiftSetAuthMessage('Rechecking the previous session and requesting control…');
+  try {
+    const result = await netshiftApi('/api/auth/force-connect', { method: 'POST', body: '{}' });
+    button.hidden = true;
+    await netshiftAfterAuth(result.user);
+    toast('Force Connect succeeded.');
+  } catch (error) {
+    netshiftSetAuthMessage(error.message, 'error');
+    button.hidden = error.code !== 'ACTIVE_SESSION_UNREACHABLE';
+  } finally { button.disabled = false; }
+}
 
 </script></body></html>

@@ -1,0 +1,44 @@
+NETSHIFT Stage 1 — Chunk 8 test log
+Recorded: 2026-10-13
+Source: isolated local working copy at /mnt/data/netshift-stage1-work
+Scope: atomic host-stock claim, claim ledger and canonical player-file delivery.
+
+Commands and results
+- node --check server.js — PASS (also included in npm run check)
+- node --check lib/host-download-claim.js — PASS
+- node --check scripts/check-stage1-host-download-claim.js — PASS
+- node scripts/check-stage1-host-download-claim.js — PASS
+- npm run check — PASS
+- Final archive integrity test: `unzip -t /mnt/data/NETSHIFT_Stage1_Chunk8_AtomicHostDownloads_Bundle.zip` — PASS (no errors in compressed data). The archive was rebuilt after this log/manifest update and retested successfully.
+
+Focused cases in scripts/check-stage1-host-download-claim.js
+- Successful claim creates one canonical /downloads record and one claim while removing the item from host stock.
+- Filename uniqueness conflict returns DOWNLOAD_NAME_CONFLICT (409), rolls back stock/claim/file writes and does not commit.
+- Unexpected canonical file insert failure rolls back all transaction writes.
+- Concurrent requests for the same stock item yield one winner and one rejected request; only one canonical file and one claim are present.
+- A previously claimed item ID cannot be reintroduced and awarded again.
+- Claiming requires current host control and active session ownership.
+- Invalid/duplicate stock IDs and malformed software metadata are rejected rather than guessed.
+- Host inventory response strips file contents and internal credential metadata.
+- Static wiring checks confirm the owner-only inventory route, rate-limited claim route and client refresh of canonical files.
+
+Limitations
+- The tests use a purpose-built in-memory SQL adapter. They do not connect to PostgreSQL and do not prove actual PostgreSQL advisory/row locking, transaction isolation or unique-index behaviour.
+- No browser, two-account, staging, regeneration-runtime, GitHub or deployment test was performed.
+- Full npm run check output:
+  Client JavaScript syntax OK
+  Multiplayer foundation markers OK
+  Session ownership and persistent chat markers OK
+  Shared host compromise rule and integration checks OK
+  Core v2 schema, SafetyShield, player files, bank UI/API, shared downloads and admin API markers OK
+  Game identity checks OK
+  Core file UI checks OK
+  Stage 1 migration contract fixtures OK (12 scenarios)
+  Stage 1 save protocol checks OK
+  Stage 1 client save protocol checks OK
+  Stage 1 save cutover tests OK
+  Stage 1 hydration gate checks OK
+  Stage 1 canonical inventory checks OK
+  Stage 1 host-download claim checks OK
+
+No GitHub writes, commits, pushes, live database operations or deployments were performed.

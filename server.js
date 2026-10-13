@@ -12,6 +12,10 @@ const { rateLimit } = require('express-rate-limit');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { worldBreachChance } = require('./lib/world-rules');
+const { generateGameIp, generateBankAccountNumber, legacyDeterministicAccountNumber } = require('./lib/game-identities');
+const { applyLegacySaveCutover, isRetiredLegacySave } = require('./lib/legacy-save-cutover');
+const { validateSaveRequest, normaliseStoredSave } = require('./lib/save-protocol');
+const { HostDownloadClaimError, assertHostSlug, assertHostItemId, normaliseHostStock, publicHostStockItem, claimHostDownload } = require('./lib/host-download-claim');
 
 const isProduction = process.env.NODE_ENV === 'production';
 const PORT = Number(process.env.PORT || 3000);
@@ -49,10 +53,35 @@ async function initialiseDatabase() {
       password_hash TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+    -- Email identity is optional until the in-game mail system is introduced. Accounts
+    -- may predate their NETSHIFT email address; never infer/reset bank credentials here.
+    ALTER TABLE netshift_users
+      ADD COLUMN IF NOT EXISTS email_address VARCHAR(254),
+      ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ;
+    CREATE UNIQUE INDEX IF NOT EXISTS netshift_users_email_lower_unique
+      ON netshift_users (LOWER(email_address)) WHERE email_address IS NOT NULL;
+    CREATE TABLE IF NOT EXISTS netshift_password_reset_tokens (
+      id UUID PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES netshift_users(id) ON DELETE CASCADE,
+      email_address VARCHAR(254) NOT NULL,
+      token_hash CHAR(64) NOT NULL UNIQUE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      used_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS netshift_password_reset_user_idx
+      ON netshift_password_reset_tokens (user_id, created_at DESC);
+
     CREATE TABLE IF NOT EXISTS netshift_saves (
       user_id BIGINT PRIMARY KEY REFERENCES netshift_users(id) ON DELETE CASCADE,
       save_data JSONB NOT NULL,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS netshift_migration_receipts (
+      migration_key VARCHAR(120) PRIMARY KEY,
+      description TEXT NOT NULL,
+      applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      details JSONB NOT NULL DEFAULT '{}'::jsonb
     );
     CREATE TABLE IF NOT EXISTS netshift_sessions (
       sid VARCHAR NOT NULL COLLATE "default",
@@ -147,7 +176,98 @@ async function initialiseDatabase() {
     );
     CREATE INDEX IF NOT EXISTS netshift_world_chat_created_idx
       ON netshift_world_chat (created_at DESC, id DESC);
+
+    -- NETSHIFT Core v2: canonical, server-authoritative player and shared-host state.
+    CREATE TABLE IF NOT EXISTS netshift_player_world (
+      user_id BIGINT PRIMARY KEY REFERENCES netshift_users(id) ON DELETE CASCADE,
+      workstation_ip INET NOT NULL UNIQUE,
+      safety_shield BOOLEAN NOT NULL DEFAULT TRUE,
+      shield_changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      shield_has_been_changed BOOLEAN NOT NULL DEFAULT FALSE,
+      pvp_immune_until TIMESTAMPTZ,
+      bank_setup_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS netshift_bank_accounts (
+      id BIGSERIAL PRIMARY KEY,
+      owner_user_id BIGINT REFERENCES netshift_users(id) ON DELETE CASCADE,
+      bank_code VARCHAR(32) NOT NULL,
+      account_number VARCHAR(24) NOT NULL UNIQUE,
+      account_username VARCHAR(40) NOT NULL UNIQUE,
+      password_hash TEXT,
+      balance_cents BIGINT NOT NULL DEFAULT 50000 CHECK (balance_cents >= 0),
+      is_player BOOLEAN NOT NULL DEFAULT FALSE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(owner_user_id)
+    );
+    CREATE TABLE IF NOT EXISTS netshift_player_files (
+      id UUID PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES netshift_users(id) ON DELETE CASCADE,
+      parent_path VARCHAR(500) NOT NULL DEFAULT '/',
+      name VARCHAR(180) NOT NULL,
+      item_type VARCHAR(16) NOT NULL CHECK (item_type IN ('file','folder','software')),
+      mime_type VARCHAR(100) NOT NULL DEFAULT 'text/plain',
+      content TEXT NOT NULL DEFAULT '',
+      software_family VARCHAR(40),
+      software_level SMALLINT CHECK (software_level BETWEEN 1 AND 6),
+      deleted_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(user_id, parent_path, name)
+    );
+    ALTER TABLE netshift_player_files ADD COLUMN IF NOT EXISTS recycle_bin_at TIMESTAMPTZ;
+    -- The previous full unique constraint prevented reusing a filename after it was
+    -- moved to the Recycle Bin. Active files/folders alone need unique names.
+    ALTER TABLE netshift_player_files DROP CONSTRAINT IF EXISTS netshift_player_files_user_id_parent_path_name_key;
+    CREATE UNIQUE INDEX IF NOT EXISTS netshift_player_files_active_name_idx
+      ON netshift_player_files(user_id, parent_path, name)
+      WHERE deleted_at IS NULL AND recycle_bin_at IS NULL;
+    CREATE INDEX IF NOT EXISTS netshift_player_files_user_idx ON netshift_player_files(user_id, deleted_at, recycle_bin_at, parent_path);
+    CREATE TABLE IF NOT EXISTS netshift_world_host_inventory (
+      target_slug VARCHAR(40) PRIMARY KEY REFERENCES netshift_world_targets(slug) ON DELETE CASCADE,
+      stock JSONB NOT NULL DEFAULT '[]'::jsonb,
+      money_cents BIGINT NOT NULL DEFAULT 0 CHECK (money_cents >= 0),
+      last_intrusion_at TIMESTAMPTZ,
+      next_regen_at TIMESTAMPTZ,
+      credential_lock_until TIMESTAMPTZ,
+      inventory_version BIGINT NOT NULL DEFAULT 1
+    );
+    CREATE TABLE IF NOT EXISTS netshift_world_loot_claims (
+      id BIGSERIAL PRIMARY KEY,
+      target_slug VARCHAR(40) NOT NULL REFERENCES netshift_world_targets(slug) ON DELETE CASCADE,
+      item_key VARCHAR(120) NOT NULL,
+      claimed_by_user_id BIGINT REFERENCES netshift_users(id) ON DELETE SET NULL,
+      claimed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      regen_after TIMESTAMPTZ
+    );
+    CREATE TABLE IF NOT EXISTS netshift_admin_roles (
+      user_id BIGINT PRIMARY KEY REFERENCES netshift_users(id) ON DELETE CASCADE,
+      granted_by VARCHAR(100) NOT NULL,
+      granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      mfa_required BOOLEAN NOT NULL DEFAULT TRUE
+    );
+    CREATE TABLE IF NOT EXISTS netshift_admin_audit (
+      id BIGSERIAL PRIMARY KEY,
+      actor_user_id BIGINT REFERENCES netshift_users(id) ON DELETE SET NULL,
+      actor_username VARCHAR(20) NOT NULL,
+      action VARCHAR(60) NOT NULL,
+      subject_username VARCHAR(20),
+      detail JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS netshift_admin_audit_created_idx ON netshift_admin_audit(created_at DESC);
+    CREATE TABLE IF NOT EXISTS netshift_user_bans (
+      user_id BIGINT PRIMARY KEY REFERENCES netshift_users(id) ON DELETE CASCADE,
+      banned_by_user_id BIGINT REFERENCES netshift_users(id) ON DELETE SET NULL,
+      reason VARCHAR(500) NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
+  // First-time SafetyShield change is allowed immediately; the one-hour cooldown
+  // begins only after the player actually changes the default ON setting.
+  await pool.query(`ALTER TABLE netshift_player_world
+    ADD COLUMN IF NOT EXISTS shield_has_been_changed BOOLEAN NOT NULL DEFAULT FALSE`);
+
   // Seed the shared public-host directory idempotently. Target counters and probe history
   // are preserved on restarts and redeploys.
   for (const target of WORLD_TARGET_SEEDS) {
@@ -161,7 +281,20 @@ async function initialiseDatabase() {
         description = EXCLUDED.description,
         updated_at = NOW()
     `, [target.slug, target.name, target.domain, target.securityLevel, target.description]);
+    const stock = [
+      { id: `${target.slug}-readme`, name: 'README.txt', type: 'file', content: `Public files for ${target.name}.` },
+      { id: `${target.slug}-warez1`, name: 'Warez Virus L1.vshare', type: 'software', family: 'warez', level: 1 }
+    ];
+    await pool.query(`INSERT INTO netshift_world_host_inventory(target_slug,stock,money_cents)
+      VALUES($1,$2::jsonb,$3) ON CONFLICT(target_slug) DO NOTHING`, [target.slug, JSON.stringify(stock), target.securityLevel <= 1 ? 25000 : 10000]);
   }
+
+  // This one-time reset runs before the HTTP server starts accepting requests.
+  // It deletes legacy save documents only; dedicated server-authoritative tables stay intact.
+  const cutover = await applyLegacySaveCutover(pool);
+  console.log(cutover.applied
+    ? `Legacy save cutover applied; retired ${cutover.deletedSaveCount} save row(s).`
+    : 'Legacy save cutover already applied; no save rows changed.');
 }
 
 const WORLD_TARGET_SEEDS = [
@@ -270,6 +403,126 @@ async function readWorldSnapshot(userId) {
   };
 }
 
+
+async function ensureUniquePlayerWorldRow(userId) {
+  // Use database uniqueness as the final collision guard. The retry loop means
+  // two players can be created concurrently without sharing a simulated address.
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    try {
+      await pool.query(`INSERT INTO netshift_player_world (user_id, workstation_ip)
+        VALUES ($1, $2::inet) ON CONFLICT (user_id) DO NOTHING`, [userId, generateGameIp()]);
+      return;
+    } catch (error) {
+      if (error.code === '23505' && error.constraint === 'netshift_player_world_workstation_ip_key') continue;
+      throw error;
+    }
+  }
+  throw new Error('Could not allocate a unique simulated workstation IP after 100 attempts.');
+}
+
+async function upgradeLegacyPlayerIp(userId) {
+  const current = await pool.query(`SELECT workstation_ip::text AS ip FROM netshift_player_world WHERE user_id=$1`, [userId]);
+  // Earlier preview builds generated predictable 10.x.x.x addresses from user IDs.
+  // Move those addresses once. New addresses live in 172.16.0.0/12 and will not
+  // match this migration condition again on subsequent application starts.
+  if (!current.rowCount || !current.rows[0].ip.startsWith('10.')) return;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    try {
+      const changed = await pool.query(`UPDATE netshift_player_world
+        SET workstation_ip=$2::inet
+        WHERE user_id=$1 AND workstation_ip << inet '10.0.0.0/8'
+        RETURNING workstation_ip::text AS ip`, [userId, generateGameIp()]);
+      if (changed.rowCount) return;
+      return; // Another concurrent request already upgraded this row.
+    } catch (error) {
+      if (error.code === '23505' && error.constraint === 'netshift_player_world_workstation_ip_key') continue;
+      throw error;
+    }
+  }
+  throw new Error('Could not upgrade legacy simulated workstation IP after 100 attempts.');
+}
+
+async function ensureUniquePlayerBankAccount(userId) {
+  // A pending username is only an internal placeholder until First Bank setup.
+  // Both the number and placeholder are unique, and account-number collisions retry.
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const accountNo = generateBankAccountNumber();
+    const accountUser = `pending_${String(userId)}_${crypto.randomBytes(5).toString('hex')}`;
+    try {
+      await pool.query(`INSERT INTO netshift_bank_accounts
+        (owner_user_id, bank_code, account_number, account_username, balance_cents, is_player)
+        VALUES ($1, 'FIRST', $2, $3, 50000, TRUE) ON CONFLICT (owner_user_id) DO NOTHING`, [userId, accountNo, accountUser]);
+      return;
+    } catch (error) {
+      if (error.code === '23505' && ['netshift_bank_accounts_account_number_key', 'netshift_bank_accounts_account_username_key'].includes(error.constraint)) continue;
+      throw error;
+    }
+  }
+  throw new Error('Could not allocate a unique player bank account after 100 attempts.');
+}
+
+async function upgradeLegacyPlayerBankNumber(userId) {
+  const result = await pool.query(`SELECT account_number, is_player FROM netshift_bank_accounts WHERE owner_user_id=$1`, [userId]);
+  if (!result.rowCount || !result.rows[0].is_player) return;
+  const current = String(result.rows[0].account_number);
+  // Preserve established 8-digit numbers. Upgrade previous preview-generated 12-digit
+  // numbers (and the old six-digit demo number if one was ever persisted server-side).
+  if (/^\d{8}$/.test(current) && current !== legacyDeterministicAccountNumber(userId)) return;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const candidate = generateBankAccountNumber();
+    try {
+      const changed = await pool.query(`UPDATE netshift_bank_accounts
+        SET account_number=$2
+        WHERE owner_user_id=$1 AND account_number=$3
+        AND NOT EXISTS (SELECT 1 FROM netshift_bank_accounts other WHERE other.account_number=$2 AND other.owner_user_id<>$1)
+        RETURNING account_number`, [userId, candidate, current]);
+      if (changed.rowCount) return;
+      const latest = await pool.query('SELECT account_number FROM netshift_bank_accounts WHERE owner_user_id=$1', [userId]);
+      if (!latest.rowCount || String(latest.rows[0].account_number) !== current) return;
+    } catch (error) {
+      if (error.code === '23505' && error.constraint === 'netshift_bank_accounts_account_number_key') continue;
+      throw error;
+    }
+  }
+  throw new Error('Could not upgrade legacy player bank account number after 100 attempts.');
+}
+
+async function ensurePlayerWorld(user) {
+  await ensureUniquePlayerWorldRow(user.id);
+  await upgradeLegacyPlayerIp(user.id);
+  await ensureUniquePlayerBankAccount(user.id);
+  await upgradeLegacyPlayerBankNumber(user.id);
+  await pool.query(`INSERT INTO netshift_player_files (id, user_id, parent_path, name, item_type, content)
+    VALUES ($1, $2, '/', 'README.txt', 'file', 'Welcome to NETSHIFT. Keep notes on IP addresses and passwords here.')
+    ON CONFLICT DO NOTHING`, [crypto.randomUUID(), user.id]);
+  return (await pool.query(`SELECT p.workstation_ip::text AS workstation_ip, p.safety_shield, p.shield_changed_at,
+      p.pvp_immune_until, p.bank_setup_at, b.bank_code, b.account_number, b.account_username,
+      b.balance_cents, b.password_hash IS NOT NULL AS bank_setup
+    FROM netshift_player_world p JOIN netshift_bank_accounts b ON b.owner_user_id = p.user_id
+    WHERE p.user_id = $1`, [user.id])).rows[0];
+}
+async function requireSessionOwnership(req, res) {
+  const owner = await pool.query('SELECT session_id FROM netshift_account_ownership WHERE user_id = $1', [req.session.user.id]);
+  if (!owner.rowCount || owner.rows[0].session_id !== req.sessionID) {
+    res.status(401).json({ error: 'This session no longer owns the account.', code: 'SESSION_REVOKED' });
+    return false;
+  }
+  return true;
+}
+async function requireAdmin(req, res, next) {
+  try {
+    if (!await requireSessionOwnership(req, res)) return;
+    const result = await pool.query('SELECT 1 FROM netshift_admin_roles WHERE user_id = $1', [req.session.user.id]);
+    if (!result.rowCount) return res.status(403).json({ error: 'Administrator permission required.' });
+    req.isNetshiftAdmin = true;
+    next();
+  } catch (error) { next(error); }
+}
+async function auditAdmin(actor, action, subject = null, detail = {}) {
+  await pool.query(`INSERT INTO netshift_admin_audit (actor_user_id, actor_username, action, subject_username, detail)
+    VALUES ($1, $2, $3, $4, $5::jsonb)`, [actor.id, actor.username, action, subject, JSON.stringify(detail)]);
+}
+
 const app = express();
 // Render and other reverse proxies terminate HTTPS before forwarding traffic.
 if (isProduction) app.set('trust proxy', 1);
@@ -312,6 +565,13 @@ const saveLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Autosave limit reached. Please wait a moment.' }
 });
+const bankLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many First Bank sign-in attempts. Please wait 15 minutes and try again.' }
+});
 const worldProbeLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: 20,
@@ -325,6 +585,13 @@ const worldBreachLimiter = rateLimit({
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { error: 'Intrusion attempt limit reached. Please wait a moment.' }
+});
+const hostDownloadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Host download limit reached. Please wait a moment.' }
 });
 
 function safeUser(user) { return { id: String(user.id), username: user.username }; }
@@ -361,6 +628,7 @@ async function activatePendingLoginSession(req, user) {
   req.session.user = safeUser(user);
   delete req.session.pendingLoginUser;
   delete req.session.pendingHandoffId;
+  delete req.session.pendingForceConnect;
   await saveSession(req);
   return req.session.user;
 }
@@ -484,6 +752,10 @@ app.get('/api/auth/me', async (req, res, next) => {
         return res.json({ user: null, pendingHandoffId: req.session.pendingHandoffId,
           pendingUsername: req.session.pendingLoginUser.username });
       }
+      if (req.session.pendingForceConnect) {
+        return res.json({ user: null, pendingForceConnect: true,
+          pendingUsername: req.session.pendingLoginUser.username });
+      }
       await destroyRequestSession(req, res);
       return res.json({ user: null });
     }
@@ -517,6 +789,7 @@ app.post('/api/auth/register', authLimiter, async (req, res, next) => {
       await destroyRequestSession(req, res);
       return res.status(409).json({ error: 'Account ownership could not be established for this new account. Please sign in again.', code: 'OWNERSHIP_FAILED' });
     }
+    await ensurePlayerWorld(result.rows[0]);
     res.status(201).json({ user: safeUser(result.rows[0]) });
   } catch (error) {
     if (pendingSessionCreated) await destroyRequestSession(req, res);
@@ -540,26 +813,93 @@ app.post('/api/auth/login', authLimiter, async (req, res, next) => {
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
       return res.status(401).json({ error: 'Sign-in failed. Check your username and password.' });
     }
+    const ban = await pool.query('SELECT reason FROM netshift_user_bans WHERE user_id = $1', [user.id]);
+    if (ban.rowCount) return res.status(403).json({ error: 'This account is banned.', code: 'ACCOUNT_BANNED' });
     // Regenerate first to prevent session fixation. The candidate is not authenticated
     // until a free ownership slot is acquired or the current session approves handoff.
     await regeneratePendingLoginSession(req, user);
     pendingSessionCreated = true;
     const ownership = await claimOwnershipOrRequestHandoff(req, user);
-    if (ownership.kind === 'acquired') return res.json({ user: safeUser(user) });
+    if (ownership.kind === 'acquired') { await ensurePlayerWorld(user); return res.json({ user: safeUser(user) }); }
     if (ownership.kind === 'handoff') {
       return res.status(202).json({ handoffRequired: true, handoffId: ownership.id,
         waitingFor: user.username, expiresAt: ownership.expiresAt.toISOString(),
         message: 'This account is active elsewhere. The current session must approve the sign-in.' });
     }
-    await destroyRequestSession(req, res);
+    // Keep the password-verified pending session when the incumbent cannot be reached.
+    // This lets the player explicitly request a takeover without entering the password again.
     if (ownership.kind === 'unreachable') {
-      return res.status(409).json({ error: 'This account is still signed in, but its active session cannot currently be reached. Reconnect that session or wait for it to become inactive before retrying.', code: 'ACTIVE_SESSION_UNREACHABLE' });
+      req.session.pendingForceConnect = true;
+      await saveSession(req);
+      return res.status(409).json({ error: 'This account is still signed in, but its active session cannot currently be reached. You may force-connect to take over if it remains unreachable.', code: 'ACTIVE_SESSION_UNREACHABLE' });
     }
+    await destroyRequestSession(req, res);
     return res.status(409).json({ error: 'A sign-in handoff is already pending for this account. Ask the active session to respond, then try again.', code: 'HANDOFF_IN_PROGRESS' });
   } catch (error) {
     if (pendingSessionCreated) await destroyRequestSession(req, res);
     next(error);
   }
+});
+
+app.post('/api/auth/force-connect', authLimiter, async (req, res, next) => {
+  const pendingUser = req.session.pendingLoginUser;
+  if (req.session.user) return res.status(409).json({ error: 'This browser is already signed in.', code: 'ALREADY_SIGNED_IN' });
+  if (!pendingUser?.id || !pendingUser?.username) return res.status(401).json({ error: 'Sign in with the correct username and password before requesting Force Connect.', code: 'FORCE_CONNECT_REQUIRES_VERIFIED_LOGIN' });
+
+  const client = await pool.connect();
+  let displacedSessionId = null;
+  let user = null;
+  try {
+    await client.query('BEGIN');
+    const account = await client.query('SELECT id, username FROM netshift_users WHERE id=$1 FOR UPDATE', [pendingUser.id]);
+    if (!account.rowCount || account.rows[0].username !== pendingUser.username) {
+      await client.query('ROLLBACK');
+      await destroyRequestSession(req, res);
+      return res.status(401).json({ error: 'The pending login is no longer valid. Sign in again.', code: 'FORCE_CONNECT_LOGIN_EXPIRED' });
+    }
+    user = account.rows[0];
+    const ban = await client.query('SELECT 1 FROM netshift_user_bans WHERE user_id=$1', [user.id]);
+    if (ban.rowCount) {
+      await client.query('ROLLBACK');
+      await destroyRequestSession(req, res);
+      return res.status(403).json({ error: 'This account is banned.', code: 'ACCOUNT_BANNED' });
+    }
+
+    await client.query(`INSERT INTO netshift_account_ownership (user_id, session_id)
+      VALUES ($1,$2) ON CONFLICT (user_id) DO NOTHING`, [user.id, req.sessionID]);
+    const ownership = await client.query('SELECT session_id FROM netshift_account_ownership WHERE user_id=$1 FOR UPDATE', [user.id]);
+    if (!ownership.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'The current session could not claim account ownership. Retry sign-in.', code: 'FORCE_CONNECT_RACE' });
+    }
+    const currentOwner = ownership.rows[0].session_id;
+    if (currentOwner !== req.sessionID && hasConnectedSession(currentOwner)) {
+      await client.query('ROLLBACK');
+      await destroyRequestSession(req, res);
+      return res.status(409).json({ error: 'The existing session has become reachable. Sign in again to request the normal handoff; Force Connect is only allowed for an unreachable session.', code: 'ACTIVE_SESSION_REACHABLE' });
+    }
+    displacedSessionId = currentOwner === req.sessionID ? null : currentOwner;
+    await client.query(`UPDATE netshift_account_ownership
+      SET session_id=$2, claimed_at=NOW(), last_seen_at=NOW() WHERE user_id=$1`, [user.id, req.sessionID]);
+    await client.query(`UPDATE netshift_login_handoffs SET status='cancelled', resolved_at=NOW()
+      WHERE user_id=$1 AND status='pending'`, [user.id]);
+    if (displacedSessionId) await client.query('DELETE FROM netshift_sessions WHERE sid=$1', [displacedSessionId]);
+    await client.query('COMMIT');
+  } catch (error) {
+    try { await client.query('ROLLBACK'); } catch (_) {}
+    return next(error);
+  } finally { client.release(); }
+
+  // Defensive socket revocation in case a socket reconnects between the reachability check
+  // and ownership change. Any subsequent authenticated request also fails the ownership guard.
+  if (displacedSessionId && io) {
+    for (const socket of io.sockets.sockets.values()) {
+      if (socket.data.sessionId === displacedSessionId) socket.disconnect(true);
+    }
+  }
+  await ensurePlayerWorld(user);
+  await activatePendingLoginSession(req, user);
+  res.json({ user: safeUser(user), forceConnected: true, message: 'Force Connect succeeded. The previous unreachable session no longer owns this account.' });
 });
 
 app.post('/api/auth/heartbeat', requireAuth, (_req, res) => {
@@ -718,75 +1058,513 @@ app.post('/api/auth/logout', async (req, res, next) => {
 app.get('/api/save', requireAuth, async (req, res, next) => {
   try {
     const result = await pool.query('SELECT save_data, updated_at, revision FROM netshift_saves WHERE user_id = $1', [req.session.user.id]);
-    if (!result.rowCount) return res.json({ save: null, updatedAt: null, revision: 0 });
-    res.json({ save: result.rows[0].save_data, updatedAt: result.rows[0].updated_at, revision: Number(result.rows[0].revision) });
+    if (!result.rowCount) return res.json({ save: null, updatedAt: null, revision: 0, currentRevision: 0 });
+    const row = result.rows[0];
+    const currentRevision = Number(row.revision);
+    // Never return an unvalidated stored document. Keep the actual revision so a
+    // client can safely replace an invalid/stale document instead of looping on 409.
+    const save = normaliseStoredSave(row.save_data);
+    if (!save) {
+      return res.json({ save: null, updatedAt: null, revision: currentRevision, currentRevision, legacySaveRetired: true });
+    }
+    res.json({ save, updatedAt: row.updated_at, revision: currentRevision, currentRevision });
   } catch (error) { next(error); }
 });
 
 app.post('/api/save', requireAuth, saveLimiter, async (req, res, next) => {
   const payload = req.body;
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload) || payload.schemaVersion !== 1 ||
-      !payload.state || typeof payload.state !== 'object' || Array.isArray(payload.state)) {
-    return res.status(400).json({ error: 'The game save is invalid or uses an unsupported version.' });
-  }
-  // Revision control prevents an older browser session from silently overwriting a newer save.
-  const baseRevision = payload.baseRevision;
-  if (!Number.isSafeInteger(baseRevision) || baseRevision < 0) {
-    return res.status(428).json({ error: 'This game page is outdated or missing its save revision. Refresh the page before saving.' });
-  }
-  const saveDocument = { ...payload };
-  delete saveDocument.baseRevision;
-  let serialised;
-  try { serialised = JSON.stringify(saveDocument); }
-  catch (_error) { return res.status(400).json({ error: 'The game save could not be serialised.' }); }
-  if (Buffer.byteLength(serialised, 'utf8') > 3 * 1024 * 1024) {
-    return res.status(413).json({ error: 'Save data is too large (maximum 3 MB).' });
+  if (isRetiredLegacySave(payload)) {
+    return res.status(400).json({
+      error: 'Legacy schema-v1 saves have been retired. Sign in again to start from current game defaults.',
+      code: 'LEGACY_SAVE_RETIRED'
+    });
   }
 
+  const validation = validateSaveRequest(payload);
+  if (!validation.ok) return res.status(400).json({ error: validation.error, code: validation.code });
+
   const client = await pool.connect();
+  let transactionOpen = false;
   try {
     await client.query('BEGIN');
-    const ownership = await client.query(`SELECT session_id FROM netshift_account_ownership WHERE user_id = $1 FOR UPDATE`, [req.session.user.id]);
+    transactionOpen = true;
+
+    // Lock the account-ownership row so a concurrent session handoff cannot
+    // transfer account control halfway through this mutation.
+    const ownership = await client.query(
+      'SELECT session_id FROM netshift_account_ownership WHERE user_id = $1 FOR UPDATE',
+      [req.session.user.id]
+    );
     if (!ownership.rowCount || ownership.rows[0].session_id !== req.sessionID) {
       await client.query('ROLLBACK');
-      return res.status(401).json({ error: 'This session no longer owns the account. Sign in again.', code: 'SESSION_REVOKED' });
+      transactionOpen = false;
+      return res.status(401).json({ error: 'This session no longer owns the account.', code: 'SESSION_REVOKED' });
     }
-    await client.query(`UPDATE netshift_account_ownership SET last_seen_at = NOW() WHERE user_id = $1`, [req.session.user.id]);
-    let result;
-    if (baseRevision === 0) {
-      // The first save is allowed only when there is still no save row for this account.
-      result = await client.query(`
+
+    const saveJson = JSON.stringify(validation.save);
+    let saved;
+    if (validation.baseRevision === 0) {
+      const inserted = await client.query(`
         INSERT INTO netshift_saves (user_id, save_data, updated_at, revision)
         VALUES ($1, $2::jsonb, NOW(), 1)
         ON CONFLICT (user_id) DO NOTHING
-        RETURNING updated_at, revision
-      `, [req.session.user.id, serialised]);
+        RETURNING revision, updated_at
+      `, [req.session.user.id, saveJson]);
+      saved = inserted.rowCount ? inserted.rows[0] : null;
     } else {
-      result = await client.query(`
+      const updated = await client.query(`
         UPDATE netshift_saves
         SET save_data = $2::jsonb, updated_at = NOW(), revision = revision + 1
         WHERE user_id = $1 AND revision = $3
-        RETURNING updated_at, revision
-      `, [req.session.user.id, serialised, baseRevision]);
+        RETURNING revision, updated_at
+      `, [req.session.user.id, saveJson, validation.baseRevision]);
+      saved = updated.rowCount ? updated.rows[0] : null;
     }
 
-    if (!result.rowCount) {
+    if (!saved) {
       const latest = await client.query('SELECT revision FROM netshift_saves WHERE user_id = $1', [req.session.user.id]);
+      const currentRevision = latest.rowCount ? Number(latest.rows[0].revision) : 0;
       await client.query('ROLLBACK');
+      transactionOpen = false;
       return res.status(409).json({
-        error: 'This save changed in another session. Load the latest save before continuing to save.',
-        currentRevision: latest.rowCount ? Number(latest.rows[0].revision) : 0
+        error: 'This save is out of date. Load the latest saved preferences before retrying.',
+        code: 'SAVE_REVISION_CONFLICT', currentRevision, revision: currentRevision
       });
     }
 
     await client.query('COMMIT');
-    res.json({ ok: true, updatedAt: result.rows[0].updated_at, revision: Number(result.rows[0].revision) });
+    transactionOpen = false;
+    const currentRevision = Number(saved.revision);
+    return res.json({ ok: true, revision: currentRevision, currentRevision, updatedAt: saved.updated_at });
   } catch (error) {
-    try { await client.query('ROLLBACK'); } catch (_) { /* original error takes priority */ }
-    next(error);
+    if (transactionOpen) {
+      try { await client.query('ROLLBACK'); } catch (_) { /* preserve the original error */ }
+    }
+    return next(error);
   } finally {
     client.release();
   }
+});
+
+// NETSHIFT Core v2 APIs. All mutating gameplay actions validate ownership server-side.
+app.get('/api/core/profile', requireAuth, async (req, res, next) => {
+  try {
+    const profile = await ensurePlayerWorld(req.session.user);
+    res.json({ profile: { ip: profile.workstation_ip, safetyShield: profile.safety_shield,
+      shieldChangedAt: profile.shield_changed_at, pvpImmuneUntil: profile.pvp_immune_until,
+      bankSetup: profile.bank_setup, bank: { bank: profile.bank_code, accountNumber: profile.account_number,
+      username: profile.account_username, balance: Number(profile.balance_cents) / 100 } } });
+  } catch (e) { next(e); }
+});
+app.post('/api/core/safetyshield', requireAuth, async (req, res, next) => {
+  const enabled = req.body?.enabled;
+  if (typeof enabled !== 'boolean') return res.status(400).json({ error: 'enabled must be true or false.' });
+  try {
+    if (!await requireSessionOwnership(req, res)) return;
+    const c = await pool.connect();
+    try {
+      await c.query('BEGIN');
+      const row = await c.query('SELECT safety_shield, shield_changed_at, shield_has_been_changed FROM netshift_player_world WHERE user_id=$1 FOR UPDATE', [req.session.user.id]);
+      if (!row.rowCount) { await c.query('ROLLBACK'); return res.status(404).json({ error: 'Player profile missing.' }); }
+      const current = row.rows[0];
+      if (current.safety_shield === enabled) { await c.query('COMMIT'); return res.json({ ok: true, safetyShield: enabled, unchanged: true }); }
+      if (current.shield_has_been_changed) {
+        const remaining = 3600000 - (Date.now() - new Date(current.shield_changed_at).getTime());
+        if (remaining > 0) { await c.query('ROLLBACK'); return res.status(429).json({ error: 'SafetyShield can only be changed once per hour.', code: 'SHIELD_COOLDOWN', remainingMs: remaining }); }
+      }
+      await c.query('UPDATE netshift_player_world SET safety_shield=$2, shield_changed_at=NOW(), shield_has_been_changed=TRUE WHERE user_id=$1', [req.session.user.id, enabled]);
+      await c.query('COMMIT');
+      if (io) io.to(WORLD_ROOM).emit('world:shield-change', { username: req.session.user.username, enabled });
+      res.json({ ok: true, safetyShield: enabled, changedAt: new Date().toISOString() });
+    } catch (e) { try { await c.query('ROLLBACK'); } catch (_) {} throw e; } finally { c.release(); }
+  } catch (e) { next(e); }
+});
+app.post('/api/core/bank/first-login', requireAuth, async (req, res, next) => {
+  const username = typeof req.body?.username === 'string' ? req.body.username.trim().toLowerCase() : '';
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  if (!/^[a-zA-Z0-9_]{3,40}$/.test(username) || password.length < 8 || password.length > 128)
+    return res.status(400).json({ error: 'Choose a bank username (3–40 letters/numbers/underscores) and password (8–128 characters).' });
+  try {
+    if (!await requireSessionOwnership(req, res)) return;
+    const c = await pool.connect();
+    try {
+      await c.query('BEGIN');
+      const p = await c.query('SELECT bank_setup_at FROM netshift_player_world WHERE user_id=$1 FOR UPDATE', [req.session.user.id]);
+      if (!p.rowCount) throw new Error('Player profile missing.');
+      const existing = await c.query('SELECT password_hash FROM netshift_bank_accounts WHERE owner_user_id=$1 FOR UPDATE', [req.session.user.id]);
+      if (existing.rows[0].password_hash) { await c.query('ROLLBACK'); return res.status(409).json({ error: 'First Bank credentials have already been created.' }); }
+      const collision = await c.query('SELECT 1 FROM netshift_bank_accounts WHERE account_username=$1', [username]);
+      if (collision.rowCount) { await c.query('ROLLBACK'); return res.status(409).json({ error: 'That bank username is already taken.' }); }
+      const hash = await bcrypt.hash(password, 12);
+      await c.query('UPDATE netshift_bank_accounts SET account_username=$2, password_hash=$3 WHERE owner_user_id=$1', [req.session.user.id, username, hash]);
+      await c.query('UPDATE netshift_player_world SET bank_setup_at=NOW() WHERE user_id=$1', [req.session.user.id]);
+      await c.query('COMMIT');
+      // The successful first-visit setup also authenticates this bank session.
+      req.session.bankAuthenticatedFor = String(req.session.user.id);
+      await saveSession(req);
+      res.json({ ok: true, welcomeBonus: 500, currency: 'USD', message: 'First Bank account activated. The one-time $500 welcome bonus is included in your opening balance.' });
+    } catch (e) { try { await c.query('ROLLBACK'); } catch (_) {} if (e.message === 'Player profile missing.') return res.status(404).json({ error: e.message }); throw e; } finally { c.release(); }
+  } catch (e) { next(e); }
+});
+
+// First Bank customer authentication is tied to the already-authenticated NETSHIFT player.
+// Bank passwords are checked on the server and never returned to the client.
+app.post('/api/core/bank/login', bankLoginLimiter, requireAuth, async (req, res, next) => {
+  const username = typeof req.body?.username === 'string' ? req.body.username.trim().toLowerCase() : '';
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  if (!username || username.length > 40 || !password || password.length > 128)
+    return res.status(400).json({ error: 'Enter your First Bank username and password.' });
+  try {
+    if (!await requireSessionOwnership(req, res)) return;
+    const result = await pool.query(`SELECT account_username, password_hash FROM netshift_bank_accounts WHERE owner_user_id=$1`, [req.session.user.id]);
+    const account = result.rows[0];
+    if (!account || !account.password_hash)
+      return res.status(409).json({ error: 'Set up your First Bank account before signing in.', code: 'BANK_SETUP_REQUIRED' });
+    if (account.account_username !== username || !(await bcrypt.compare(password, account.password_hash)))
+      return res.status(401).json({ error: 'First Bank sign-in failed. Check your bank username and password.', code: 'BANK_LOGIN_FAILED' });
+    req.session.bankAuthenticatedFor = String(req.session.user.id);
+    await saveSession(req);
+    res.json({ ok: true, message: 'First Bank sign-in successful.' });
+  } catch (e) { next(e); }
+});
+app.get('/api/core/bank/account', requireAuth, async (req, res, next) => {
+  try {
+    if (!await requireSessionOwnership(req, res)) return;
+    if (req.session.bankAuthenticatedFor !== String(req.session.user.id))
+      return res.status(401).json({ error: 'Sign in to First Bank to view this account.', code: 'BANK_AUTH_REQUIRED' });
+    const result = await pool.query(`SELECT bank_code, account_number, account_username, balance_cents, password_hash
+      FROM netshift_bank_accounts WHERE owner_user_id=$1`, [req.session.user.id]);
+    const account = result.rows[0];
+    if (!account || !account.password_hash)
+      return res.status(409).json({ error: 'Set up your First Bank account before signing in.', code: 'BANK_SETUP_REQUIRED' });
+    res.json({ account: { bank: account.bank_code, accountNumber: account.account_number,
+      username: account.account_username, balance: Number(account.balance_cents) / 100, currency: 'USD' } });
+  } catch (e) { next(e); }
+});
+app.post('/api/core/bank/logout', requireAuth, async (req, res, next) => {
+  try {
+    if (!await requireSessionOwnership(req, res)) return;
+    delete req.session.bankAuthenticatedFor;
+    await saveSession(req);
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+function validPlayerFileName(name) {
+  return typeof name === 'string' && name.trim().length > 0 && name.trim().length <= 180 &&
+    !/[\\/\0]/.test(name.trim()) && !['.', '..'].includes(name.trim());
+}
+function validPlayerFileParent(parent) {
+  if (typeof parent !== 'string' || !parent.startsWith('/') || parent.length > 500 || parent.includes('..') || parent.includes('\\') || parent.includes('\0')) return false;
+  // Virtual roots are explicit; real paths must use one stable slash-separated form.
+  if (['/', '/desktop', '/downloads', '/archive'].includes(parent)) return true;
+  if (parent.length < 2 || parent.endsWith('/') || parent.includes('//')) return false;
+  return parent.slice(1).split('/').every(segment => segment && segment.trim() === segment && validPlayerFileName(segment));
+}
+async function playerFileParentExists(userId, parent, client = pool) {
+  // Desktop, Downloads and Archive are virtual top-level locations rather than folder rows.
+  if (['/', '/downloads', '/archive', '/desktop'].includes(parent)) return true;
+  const segments = parent.split('/').filter(Boolean);
+  if (!segments.length) return true;
+  const parentName = segments.at(-1);
+  const parentPath = segments.length > 1 ? '/' + segments.slice(0, -1).join('/') : '/';
+  const exists = await client.query(`SELECT 1 FROM netshift_player_files
+    WHERE user_id=$1 AND name=$2 AND parent_path=$3 AND item_type='folder'
+      AND deleted_at IS NULL AND recycle_bin_at IS NULL`, [userId, parentName, parentPath]);
+  return Boolean(exists.rowCount);
+}
+app.get('/api/core/files', requireAuth, async (req, res, next) => {
+  try {
+    const rows = await pool.query(`SELECT id, parent_path, name, item_type, mime_type, content,
+      software_family, software_level, created_at, updated_at
+      FROM netshift_player_files WHERE user_id=$1 AND deleted_at IS NULL AND recycle_bin_at IS NULL
+      ORDER BY parent_path, item_type DESC, name`, [req.session.user.id]);
+    res.json({ files: rows.rows });
+  } catch (e) { next(e); }
+});
+app.get('/api/core/files/recycle-bin', requireAuth, async (req, res, next) => {
+  try {
+    const rows = await pool.query(`SELECT id, parent_path, name, item_type, mime_type, content,
+      software_family, software_level, created_at, updated_at, recycle_bin_at
+      FROM netshift_player_files WHERE user_id=$1 AND deleted_at IS NULL AND recycle_bin_at IS NOT NULL
+      ORDER BY recycle_bin_at DESC`, [req.session.user.id]);
+    res.json({ files: rows.rows });
+  } catch (e) { next(e); }
+});
+// Move a canonical software row between Desktop, Downloads, Archive or a real user folder.
+// The server, not the browser, resolves same-family install precedence and archives older copies.
+app.patch('/api/core/files/:id/location', requireAuth, async (req, res, next) => {
+  const parent = typeof req.body?.parentPath === 'string' ? req.body.parentPath : '';
+  if (!validPlayerFileParent(parent)) return res.status(400).json({ error: 'Invalid destination folder.' });
+  const client = await pool.connect();
+  try {
+    if (!await requireSessionOwnership(req, res)) return;
+    await client.query('BEGIN');
+    const probe = await client.query(`SELECT id, software_family, software_level, name
+      FROM netshift_player_files WHERE id=$1 AND user_id=$2 AND item_type='software'
+        AND deleted_at IS NULL AND recycle_bin_at IS NULL`, [req.params.id, req.session.user.id]);
+    if (!probe.rowCount) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Canonical software item not found.' }); }
+    const currentProbe = probe.rows[0];
+    // A per-account, per-family transaction lock prevents two concurrent installs of
+    // different levels from leaving contradictory active versions.
+    const familyLock = String(currentProbe.software_family || `record:${currentProbe.id}`);
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [String(req.session.user.id), 'core-software:' + familyLock]);
+    const currentResult = await client.query(`SELECT id, parent_path, name, software_family, software_level
+      FROM netshift_player_files WHERE id=$1 AND user_id=$2 AND item_type='software'
+        AND deleted_at IS NULL AND recycle_bin_at IS NULL FOR UPDATE`, [req.params.id, req.session.user.id]);
+    if (!currentResult.rowCount) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Canonical software item is no longer active.' }); }
+    const current = currentResult.rows[0];
+    if (!await playerFileParentExists(req.session.user.id, parent, client)) {
+      await client.query('ROLLBACK'); return res.status(404).json({ error: 'Destination folder not found.' });
+    }
+    let destination = parent === '/' ? '/desktop' : parent;
+    const installing = destination === '/desktop';
+    if (installing && current.software_family) {
+      const siblings = await client.query(`SELECT id, software_level FROM netshift_player_files
+        WHERE user_id=$1 AND item_type='software' AND software_family=$2 AND id<>$3
+          AND parent_path IN ('/','/desktop') AND deleted_at IS NULL AND recycle_bin_at IS NULL
+        ORDER BY id FOR UPDATE`, [req.session.user.id, current.software_family, current.id]);
+      const higherInstalled = siblings.rows.some(row => Number(row.software_level || 0) > Number(current.software_level || 0));
+      if (higherInstalled) {
+        destination = '/archive';
+      } else if (siblings.rowCount) {
+        const archived = await client.query(`UPDATE netshift_player_files SET parent_path='/archive', updated_at=NOW()
+          WHERE user_id=$1 AND id=ANY($2::uuid[]) AND item_type='software'
+          RETURNING id`, [req.session.user.id, siblings.rows.map(row => row.id)]);
+        if (archived.rowCount !== siblings.rowCount) throw new Error('Could not archive the prior installed software version atomically.');
+      }
+    }
+    const changed = await client.query(`UPDATE netshift_player_files SET parent_path=$3, updated_at=NOW()
+      WHERE id=$1 AND user_id=$2 AND item_type='software' AND deleted_at IS NULL AND recycle_bin_at IS NULL
+      RETURNING id,parent_path,name,item_type,mime_type,content,software_family,software_level,created_at,updated_at`,
+      [req.params.id, req.session.user.id, destination]);
+    await client.query('COMMIT');
+    res.json({ ok: true, file: changed.rows[0], message: destination === '/desktop' ? 'Software installed on Desktop.' : destination === '/archive' ? 'Software stored in Archive.' : destination === '/downloads' ? 'Software moved to Downloads.' : 'Software moved to the selected folder.' });
+  } catch (error) {
+    try { await client.query('ROLLBACK'); } catch (_) {}
+    if (error.code === '23505') return res.status(409).json({ error: 'An item with that name already exists in the destination.' });
+    next(error);
+  } finally { client.release(); }
+});
+
+app.post('/api/core/files', requireAuth, async (req, res, next) => {
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+  const parent = typeof req.body?.parentPath === 'string' ? req.body.parentPath : '/';
+  const type = req.body?.type;
+  const content = typeof req.body?.content === 'string' ? req.body.content : '';
+  if (!validPlayerFileName(name)) return res.status(400).json({ error: 'Invalid file or folder name.' });
+  if (!validPlayerFileParent(parent)) return res.status(400).json({ error: 'Invalid folder path.' });
+  if (!['file','folder'].includes(type)) return res.status(400).json({ error: 'type must be file or folder.' });
+  if (content.length > 100000) return res.status(413).json({ error: 'Text files are limited to 100 KB.' });
+  try {
+    if (!await requireSessionOwnership(req, res)) return;
+    if (!await playerFileParentExists(req.session.user.id, parent)) return res.status(404).json({ error: 'Parent folder not found.' });
+    const id = crypto.randomUUID();
+    const result = await pool.query(`INSERT INTO netshift_player_files (id,user_id,parent_path,name,item_type,content)
+      VALUES ($1,$2,$3,$4,$5,$6)
+      RETURNING id,parent_path,name,item_type,mime_type,content,software_family,software_level,created_at,updated_at`,
+      [id, req.session.user.id, parent, name, type, type === 'folder' ? '' : content]);
+    res.status(201).json({ file: result.rows[0] });
+  } catch (e) { if (e.code === '23505') return res.status(409).json({ error: 'A file or folder with that name already exists here.' }); next(e); }
+});
+app.put('/api/core/files/:id', requireAuth, async (req, res, next) => {
+  const content = typeof req.body?.content === 'string' ? req.body.content : null;
+  const name = req.body?.name === undefined ? null : (typeof req.body.name === 'string' ? req.body.name.trim() : '');
+  const parent = req.body?.parentPath === undefined ? null : req.body.parentPath;
+  if (content === null || content.length > 100000) return res.status(400).json({ error: 'Provide text content up to 100 KB.' });
+  if (name !== null && !validPlayerFileName(name)) return res.status(400).json({ error: 'Invalid filename.' });
+  if (parent !== null && !validPlayerFileParent(parent)) return res.status(400).json({ error: 'Invalid folder path.' });
+  const c = await pool.connect();
+  try {
+    if (!await requireSessionOwnership(req, res)) return;
+    await c.query('BEGIN');
+    const current = await c.query(`SELECT id,name,parent_path FROM netshift_player_files
+      WHERE id=$1 AND user_id=$2 AND item_type='file' AND deleted_at IS NULL AND recycle_bin_at IS NULL FOR UPDATE`,
+      [req.params.id, req.session.user.id]);
+    if (!current.rowCount) { await c.query('ROLLBACK'); return res.status(404).json({ error: 'File not found or not editable.' }); }
+    const nextName = name ?? current.rows[0].name;
+    const nextParent = parent ?? current.rows[0].parent_path;
+    if (!await playerFileParentExists(req.session.user.id, nextParent, c)) {
+      await c.query('ROLLBACK'); return res.status(404).json({ error: 'Parent folder not found.' });
+    }
+    const result = await c.query(`UPDATE netshift_player_files SET content=$3,name=$4,parent_path=$5,updated_at=NOW()
+      WHERE id=$1 AND user_id=$2 AND item_type='file' AND deleted_at IS NULL AND recycle_bin_at IS NULL
+      RETURNING id,parent_path,name,item_type,mime_type,content,software_family,software_level,created_at,updated_at`,
+      [req.params.id, req.session.user.id, content, nextName, nextParent]);
+    await c.query('COMMIT');
+    res.json({ file: result.rows[0] });
+  } catch (e) {
+    try { await c.query('ROLLBACK'); } catch (_) {}
+    if (e.code === '23505') return res.status(409).json({ error: 'A file with that name already exists in this location.' });
+    next(e);
+  } finally { c.release(); }
+});
+app.delete('/api/core/files/:id', requireAuth, async (req, res, next) => {
+  try {
+    if (!await requireSessionOwnership(req, res)) return;
+    // Folder relocation/deletion stays disabled until child paths can be changed as
+    // one transaction. Enforce that limitation on the server, not only in the UI.
+    const result = await pool.query(`UPDATE netshift_player_files SET recycle_bin_at=NOW(),updated_at=NOW()
+      WHERE id=$1 AND user_id=$2 AND item_type IN ('file','software')
+        AND deleted_at IS NULL AND recycle_bin_at IS NULL
+      RETURNING id,name,parent_path,item_type,recycle_bin_at`,
+      [req.params.id, req.session.user.id]);
+    if (!result.rowCount) {
+      const exists = await pool.query(`SELECT item_type FROM netshift_player_files WHERE id=$1 AND user_id=$2
+        AND deleted_at IS NULL AND recycle_bin_at IS NULL`, [req.params.id, req.session.user.id]);
+      if (exists.rows[0]?.item_type === 'folder') return res.status(409).json({ error: 'Folder deletion is disabled until child-path handling can be made safe.' });
+      return res.status(404).json({ error: 'File not found.' });
+    }
+    res.json({ ok: true, deleted: result.rows[0] });
+  } catch (e) { next(e); }
+});
+app.post('/api/core/files/:id/restore', requireAuth, async (req, res, next) => {
+  const c = await pool.connect();
+  try {
+    if (!await requireSessionOwnership(req, res)) return;
+    await c.query('BEGIN');
+    const probe = await c.query(`SELECT id,parent_path,name,item_type,software_family,software_level
+      FROM netshift_player_files WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL AND recycle_bin_at IS NOT NULL`,
+      [req.params.id, req.session.user.id]);
+    if (!probe.rowCount) { await c.query('ROLLBACK'); return res.status(404).json({ error: 'Recycled item not found.' }); }
+    const probeItem = probe.rows[0];
+    const shouldApplyInstallRules = probeItem.item_type === 'software' &&
+      ['/', '/desktop'].includes(probeItem.parent_path || '/') && !!probeItem.software_family;
+    // Keep the lock order consistent with the install endpoint: family lock before the
+    // item row lock. This avoids contradictory versions during concurrent restore/install.
+    if (shouldApplyInstallRules) {
+      await c.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))',
+        [String(req.session.user.id), 'core-software:' + String(probeItem.software_family)]);
+    }
+    const currentResult = await c.query(`SELECT id,parent_path,name,item_type,software_family,software_level,
+        mime_type,content,created_at,updated_at
+      FROM netshift_player_files WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL AND recycle_bin_at IS NOT NULL FOR UPDATE`,
+      [req.params.id, req.session.user.id]);
+    if (!currentResult.rowCount) { await c.query('ROLLBACK'); return res.status(404).json({ error: 'Recycled item is no longer available.' }); }
+    const current = currentResult.rows[0];
+    if (!await playerFileParentExists(req.session.user.id, current.parent_path || '/', c)) {
+      await c.query('ROLLBACK'); return res.status(409).json({ error: 'The original folder no longer exists. Restore or recreate the parent folder first.' });
+    }
+    let destination = current.parent_path || '/';
+    if (shouldApplyInstallRules) {
+      destination = '/desktop';
+      const siblings = await c.query(`SELECT id,software_level FROM netshift_player_files
+        WHERE user_id=$1 AND item_type='software' AND software_family=$2 AND id<>$3
+          AND parent_path IN ('/','/desktop') AND deleted_at IS NULL AND recycle_bin_at IS NULL
+        ORDER BY id FOR UPDATE`, [req.session.user.id, current.software_family, current.id]);
+      const higherInstalled = siblings.rows.some(row => Number(row.software_level || 0) > Number(current.software_level || 0));
+      if (higherInstalled) {
+        destination = '/archive';
+      } else if (siblings.rowCount) {
+        const archived = await c.query(`UPDATE netshift_player_files SET parent_path='/archive',updated_at=NOW()
+          WHERE user_id=$1 AND id=ANY($2::uuid[]) AND item_type='software'
+          RETURNING id`, [req.session.user.id, siblings.rows.map(row => row.id)]);
+        if (archived.rowCount !== siblings.rowCount) throw new Error('Could not archive prior installed software atomically during restore.');
+      }
+    }
+    const result = await c.query(`UPDATE netshift_player_files SET recycle_bin_at=NULL,parent_path=$3,updated_at=NOW()
+      WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL AND recycle_bin_at IS NOT NULL
+      RETURNING id,parent_path,name,item_type,mime_type,content,software_family,software_level,created_at,updated_at`,
+      [req.params.id, req.session.user.id, destination]);
+    if (!result.rowCount) throw new Error('The recycled item could not be restored.');
+    await c.query('COMMIT');
+    res.json({ ok: true, file: result.rows[0], message: destination === '/archive' && current.item_type === 'software'
+      ? 'A higher-level copy is already installed; restored software was kept in Archive.' : 'Item restored.' });
+  } catch (e) {
+    try { await c.query('ROLLBACK'); } catch (_) {}
+    if (e.code === '23505') return res.status(409).json({ error: 'An item with that name already exists here. Rename the existing item before restoring.' });
+    next(e);
+  } finally { c.release(); }
+});
+app.delete('/api/core/files/:id/permanent', requireAuth, async (req, res, next) => {
+  try {
+    if (!await requireSessionOwnership(req, res)) return;
+    const exists = await pool.query(`SELECT item_type FROM netshift_player_files WHERE id=$1 AND user_id=$2
+      AND deleted_at IS NULL AND recycle_bin_at IS NOT NULL`, [req.params.id, req.session.user.id]);
+    if (exists.rows[0]?.item_type === 'folder')
+      return res.status(409).json({ error: 'Folder deletion is disabled until child-path handling can be made safe.' });
+    const result = await pool.query(`DELETE FROM netshift_player_files
+      WHERE id=$1 AND user_id=$2 AND item_type IN ('file','software')
+        AND deleted_at IS NULL AND recycle_bin_at IS NOT NULL RETURNING id,name,item_type`,
+      [req.params.id, req.session.user.id]);
+    if (!result.rowCount) return res.status(404).json({ error: 'Recycled item not found.' });
+    res.json({ ok: true, deleted: result.rows[0] });
+  } catch (e) { next(e); }
+});
+app.get('/api/core/hosts/:slug/inventory', requireAuth, async (req, res, next) => {
+  try {
+    const slug = assertHostSlug(req.params.slug);
+    if (!await requireSessionOwnership(req, res)) return;
+    const result = await pool.query(`SELECT t.slug, t.name, t.compromised_by_user_id,
+        h.stock, h.inventory_version, h.next_regen_at
+      FROM netshift_world_targets t
+      LEFT JOIN netshift_world_host_inventory h ON h.target_slug=t.slug
+      WHERE t.slug=$1`, [slug]);
+    if (!result.rowCount) return res.status(404).json({ error: 'That shared host was not found.', code: 'HOST_NOT_FOUND' });
+    const row = result.rows[0];
+    if (String(row.compromised_by_user_id ?? '') !== String(req.session.user.id)) {
+      return res.status(403).json({ error: 'You must control this host before viewing its downloads.', code: 'HOST_ACCESS_REQUIRED' });
+    }
+    if (row.stock == null) return res.status(404).json({ error: 'Host inventory is not available.', code: 'HOST_INVENTORY_NOT_FOUND' });
+    const stock = normaliseHostStock(row.stock, validPlayerFileName);
+    res.json({ ok: true, host: { slug: row.slug, name: row.name },
+      items: stock.map(publicHostStockItem), inventoryVersion: String(row.inventory_version),
+      regenAt: row.next_regen_at || null });
+  } catch (error) {
+    if (error instanceof HostDownloadClaimError) return res.status(error.status).json({ error: error.message, code: error.code });
+    next(error);
+  }
+});
+
+app.post('/api/core/hosts/:slug/download', requireAuth, hostDownloadLimiter, async (req, res, next) => {
+  try {
+    const slug = assertHostSlug(req.params.slug);
+    const itemId = assertHostItemId(req.body?.itemId);
+    const result = await claimHostDownload(pool, {
+      userId: req.session.user.id,
+      sessionId: req.sessionID,
+      slug,
+      itemId,
+      validPlayerFileName
+    });
+    res.json({ ok: true, ...result, message: 'Download complete. The item is now in your server-owned Downloads inventory.' });
+  } catch (error) {
+    if (error instanceof HostDownloadClaimError) return res.status(error.status).json({ error: error.message, code: error.code });
+    next(error);
+  }
+});
+app.get('/api/admin/viewusers', requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const result = await pool.query(`SELECT u.username,u.created_at,(o.last_seen_at > NOW()-INTERVAL '60 seconds') AS online,
+      p.workstation_ip::text AS workstation_ip FROM netshift_users u LEFT JOIN netshift_account_ownership o ON o.user_id=u.id
+      LEFT JOIN netshift_player_world p ON p.user_id=u.id ORDER BY online DESC,u.username`);
+    await auditAdmin(req.session.user, 'viewusers'); res.json({ users: result.rows });
+  } catch (e) { next(e); }
+});
+app.post('/api/admin/:action/:username', requireAuth, requireAdmin, async (req, res, next) => {
+  const action = req.params.action;
+  const username = String(req.params.username || '').toLowerCase();
+  if (!['kick','ban','unban'].includes(action) || !/^[a-z0-9_]{3,20}$/.test(username)) return res.status(400).json({ error: 'Invalid admin action or username.' });
+  try {
+    const target = await pool.query('SELECT id,username FROM netshift_users WHERE username=$1', [username]);
+    if (!target.rowCount) return res.status(404).json({ error: 'User not found.' });
+    if (String(target.rows[0].id) === String(req.session.user.id)) return res.status(400).json({ error: 'You cannot apply this action to your own account.' });
+    if (action === 'kick') await pool.query('DELETE FROM netshift_account_ownership WHERE user_id=$1', [target.rows[0].id]);
+    if (action === 'ban') {
+      await pool.query(`INSERT INTO netshift_user_bans(user_id,banned_by_user_id,reason) VALUES($1,$2,$3)
+        ON CONFLICT(user_id) DO UPDATE SET banned_by_user_id=EXCLUDED.banned_by_user_id,reason=EXCLUDED.reason,created_at=NOW()`, [target.rows[0].id, req.session.user.id, String(req.body?.reason || 'Administrative ban').slice(0,500)]);
+      await pool.query('DELETE FROM netshift_account_ownership WHERE user_id=$1', [target.rows[0].id]);
+      await pool.query(`DELETE FROM netshift_sessions WHERE sess->'user'->>'id'=$1`, [String(target.rows[0].id)]);
+    }
+    if (action === 'unban') await pool.query('DELETE FROM netshift_user_bans WHERE user_id=$1', [target.rows[0].id]);
+    await auditAdmin(req.session.user, action, target.rows[0].username, { reason: String(req.body?.reason || '').slice(0,500) });
+    res.json({ ok: true, action, username });
+  } catch (e) { next(e); }
+});
+app.get('/api/admin/logs', requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const result = await pool.query(`SELECT actor_username,action,subject_username,detail,created_at FROM netshift_admin_audit ORDER BY id DESC LIMIT 500`);
+    await auditAdmin(req.session.user, 'checkadminlogs'); res.json({ logs: result.rows });
+  } catch (e) { next(e); }
 });
 
 // Shared multiplayer foundation: this initial slice shares public target metadata and
@@ -916,6 +1694,7 @@ app.post('/api/world/targets/:slug/breach', requireAuth, worldBreachLimiter, asy
                   last_probed_by_username, last_probed_at, compromised_by_user_id, compromised_by_username, compromised_at`,
         [slug, req.session.user.id, req.session.user.username]);
       updatedTargetRow = updated.rows[0];
+      await client.query(`UPDATE netshift_world_host_inventory SET last_intrusion_at=NOW(), next_regen_at=NOW()+INTERVAL '5 minutes', inventory_version=inventory_version+1 WHERE target_slug=$1`, [slug]);
       eventType = previousOwner ? 'target.reclaimed' : 'target.breached';
       resultText = previousOwner ? `Intrusion successful. You took control of ${current.name} from ${previousOwner}.` : `Intrusion successful. You now control ${current.name}.`;
     } else {
@@ -1062,6 +1841,22 @@ async function start() {
     } catch (error) { console.error('Handoff expiry sweep failed:', error.message); }
   }, 30000);
   handoffSweeper.unref();
+
+  // Coordinated database-timestamp-based world inventory refresh. Credential-bearing
+  // hosts use a three-day lockout before their next ordinary five-minute regeneration.
+  const worldRegenTicker = setInterval(async () => {
+    try {
+      await pool.query(`UPDATE netshift_world_host_inventory
+        SET stock = COALESCE(stock, '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
+          'id', target_slug || '-warez1-' || floor(extract(epoch FROM NOW())/300)::bigint,
+          'name','Warez Virus L1.vshare','type','software','family','warez','level',1)),
+          money_cents = GREATEST(money_cents, 10000), inventory_version=inventory_version+1,
+          next_regen_at = NOW() + INTERVAL '5 minutes'
+        WHERE next_regen_at IS NOT NULL AND next_regen_at <= NOW()
+          AND (credential_lock_until IS NULL OR credential_lock_until <= NOW())`);
+    } catch (error) { console.error('World inventory regeneration failed:', error.message); }
+  }, 30000);
+  worldRegenTicker.unref();
 
   const shutdown = signal => {
     console.log(`${signal} received; closing NETSHIFT Online.`);

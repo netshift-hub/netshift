@@ -1,0 +1,26 @@
+NETSHIFT Stage 1 — Chunk 2 (migration contract and fixtures)
+Source baseline: netshift-hub/netshift staging @ 06c28e60f348e1b2b1891d00db597180afd4eae0
+Local source directory: /mnt/data/netshift-staging-tested
+No database was configured, accessed, or modified. No app runtime migration was executed.
+
+Baseline before changes:
+- npm run check: PASS (exit code 0)
+
+Checks after changes:
+- node --check server.js: PASS (exit code 0)
+- node scripts/check-client.js: PASS; Client JavaScript syntax OK
+- node scripts/check-stage1-migration-contract.js: PASS; 12 fixture scenarios present and contract consistency validated
+- npm run check: PASS (exit code 0)
+  - node --check server.js
+  - node scripts/check-client.js
+  - node scripts/check-multiplayer-markers.js
+  - node scripts/check-session-chat.js
+  - node scripts/check-world-compromise.js
+  - node scripts/check-core-v2.js
+  - node scripts/check-game-identities.js
+  - node scripts/check-core-files-ui.js
+  - node scripts/check-stage1-migration-contract.js
+
+Scope note: these are syntax/static/fixture-contract checks only. They do not prove reset transaction atomicity/idempotency, stale schema-v1 rejection, database preservation, file isolation or download claim rollback. Those require implementation in later Stage 1 chunks and isolated integration tests.
+
+No GitHub writes, pushes or deployments were performed.

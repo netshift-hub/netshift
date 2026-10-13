@@ -1,0 +1,34 @@
+NETSHIFT Stage 1 — Chunk 4 test log: server-side schema-v2 save boundary
+Recorded: 2026-10-13
+Base: saved Stage 1 Chunk 3 bundle, recorded commit reference 06c28e60f348e1b2b1891d00db597180afd4eae0
+Working copy: /mnt/data/netshift-stage1-work
+
+Commands and results:
+- node --check server.js: PASS
+- node --check lib/save-protocol.js: PASS
+- node --check scripts/check-stage1-save-protocol.js: PASS
+- npm run check: PASS
+  - server.js syntax
+  - client JavaScript syntax
+  - multiplayer markers
+  - session ownership and persistent chat markers
+  - shared host compromise rules
+  - Core v2 markers
+  - game identity checks
+  - Core file UI checks
+  - Stage 1 migration contract fixture validation (12 scenarios)
+  - Stage 1 save protocol allowlist/sanitisation/revision tests
+  - Stage 1 save cutover tests (in-memory SQL adapter)
+
+Save protocol tests include:
+- Schema-v2 preferences-only valid payloads.
+- Rejection of schema-v1, unsupported schema versions, unexpected request keys and unexpected preference keys.
+- Rejection of injected state, balances/inventory-style preference keys, invalid addresses and malformed/out-of-range base revisions.
+- Validation/sanitisation of stored saves so protected fields are never returned raw.
+- Static checks for transaction boundaries, session ownership locking, create/update revision checks and conflict revision reporting.
+
+Limitations:
+- Tests are syntax, unit and static-contract checks. The working copy has no installed runtime dependencies (`express`, `pg`, `bcryptjs` were not present), no configured database and no Git metadata. Therefore the server was not started and no HTTP/database/browser integration test ran.
+- In-memory adapter tests do not establish PostgreSQL advisory/row-lock semantics.
+- Current `public/index.html` still submits schema-v1 full-state payloads. The server rejects these requests by design until Chunk 5 moves the frontend to schema v2. This bundle must not be deployed as a working build.
+- No GitHub operations, commits, pushes, staging access or deployments were performed.

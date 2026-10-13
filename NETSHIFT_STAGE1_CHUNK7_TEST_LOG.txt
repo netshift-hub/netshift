@@ -1,0 +1,62 @@
+NETSHIFT Stage 1 — Chunk 7 test log
+Recorded: 2026-10-13
+Working copy: /mnt/data/netshift-stage1-work
+Repository reference from prior checkpoints: netshift-hub/netshift, staging @ 06c28e60f348e1b2b1891d00db597180afd4eae0 (not independently verified against a live remote in this runtime)
+Database access: none. No live browser/two-account test, staging operation, GitHub write, push or deployment occurred.
+
+Final validation commands and results:
+- node --check server.js: PASS (included in npm run check)
+- node scripts/check-client.js: PASS (included in npm run check; Client JavaScript syntax OK)
+- node scripts/check-stage1-canonical-inventory.js: PASS
+- npm run check: PASS
+  - node --check server.js
+  - node scripts/check-client.js
+  - node scripts/check-multiplayer-markers.js
+  - node scripts/check-session-chat.js
+  - node scripts/check-world-compromise.js
+  - node scripts/check-core-v2.js
+  - node scripts/check-game-identities.js
+  - node scripts/check-core-files-ui.js
+  - node scripts/check-stage1-migration-contract.js
+  - node scripts/check-stage1-save-protocol.js
+  - node scripts/check-stage1-client-save-protocol.js
+  - node scripts/check-stage1-save-cutover.js
+  - node scripts/check-stage1-hydration-gate.js
+  - node scripts/check-stage1-canonical-inventory.js
+
+Coverage added/updated:
+- Distinct file/software/folder view models and no filename-keyed location writes from canonical upsert/hydration/Notepad save.
+- Canonical record ID preservation in desktop/software/Explorer/Recycle Bin rendering.
+- Unknown software family remains visible under the stored name without guessing a catalogue identity.
+- Legacy duplicate mirror and fictional bank-info demo filtering; canonical bank-info file remains displayable.
+- Owner-scoped software-location endpoint markers, transaction/family locking, software-level install/restore precedence, folder-deletion fail-closed behaviour and canonical parent-path validation.
+
+Limitations:
+- Tests are syntax/static/helper checks, not browser integration.
+- In-memory tests from earlier chunks do not prove actual PostgreSQL transaction/advisory-lock semantics.
+- Host download atomicity is not fixed in this chunk and remains the next Stage 1 chunk.
+- Remaining legacy browser inventory writers are not all retired; Chunk 9 remains necessary.
+
+Captured final `npm run check` output:
+
+> netshift-online@2.0.0 check
+> node --check server.js && node scripts/check-client.js && node scripts/check-multiplayer-markers.js && node scripts/check-session-chat.js && node scripts/check-world-compromise.js && node scripts/check-core-v2.js && node scripts/check-game-identities.js && node scripts/check-core-files-ui.js && node scripts/check-stage1-migration-contract.js && node scripts/check-stage1-save-protocol.js && node scripts/check-stage1-client-save-protocol.js && node scripts/check-stage1-save-cutover.js && node scripts/check-stage1-hydration-gate.js && node scripts/check-stage1-canonical-inventory.js
+
+Client JavaScript syntax OK
+Multiplayer foundation markers OK
+Session ownership and persistent chat markers OK
+Shared host compromise rule and integration checks OK
+Core v2 schema, SafetyShield, player files, bank UI/API, shared downloads and admin API markers OK
+Game identity checks OK (fictional IPv4 format, private address range, random 8-digit bank numbers).
+Core file UI checks OK (server-backed Notepad, recycle bin, preferences-only save ownership and Force Connect markers).
+Stage 1 migration contract fixtures OK (12 scenarios). PostgreSQL integration is separate from this fixture check.
+Stage 1 save protocol checks OK (allowlist, protected-field rejection, stored-save sanitisation and revision contract).
+Note: these tests do not replace PostgreSQL integration or browser tests.
+Stage 1 client save protocol checks OK (v2 preference payload, restore, revision, conflict and page-hide paths).
+Stage 1 save cutover tests OK (first run, canonical preservation, retry, rollback, concurrency, stale-save rejection).
+Note: tests use an isolated in-memory SQL adapter; PostgreSQL/staging integration remains unverified.
+Stage 1 hydration gate checks OK (required profile/files, malformed-response rejection, retry, timeout and gameplay-timer pause).
+Stage 1 canonical inventory checks OK (typed mapping, canonical view models, Desktop/Explorer/Recycle Bin rendering and owner-scoped software movement).
+
+Bundle integrity validation:
+- `unzip -t /mnt/data/NETSHIFT_Stage1_Chunk7_CanonicalInventory_Bundle.zip`: PASS. The archive is re-created after this log/manifest update and rechecked before delivery.
