@@ -42,23 +42,33 @@ fetch('/api/core/safetyshield', {
 
 Do not try to reset the cooldown by editing the browser, save data, or database manually. The one-hour timer is intentional.
 
-## D. First Bank account setup API
+## D. First Bank setup, login and account isolation
 
-On a separate test account that has not set up bank credentials, use a unique temporary username and a disposable password of at least eight characters:
+Use two disposable NETSHIFT player accounts, A and B. Open First Bank (`firstbank.local`) while signed in as each player.
+
+- [ ] An account that has not created bank credentials is prompted to choose a separate bank username and password.
+- [ ] Account setup succeeds and authenticates the player's First Bank session.
+- [ ] The bank overview shows that player's unique account number and the server-loaded $500 opening balance.
+- [ ] My Computer shows the same account number and balance as the profile API, not the old fixed `100001` demo value.
+- [ ] Reload the game. `/api/core/profile` reports the same account number; `bankSetup` remains true.
+- [ ] After signing out of First Bank, the page asks for bank credentials again. Correct credentials work; an incorrect password is rejected.
+- [ ] Player A and B have different account numbers and distinct bank usernames/credentials.
+- [ ] Repeating first-time setup returns HTTP 409 and does not reset existing credentials.
+
+Optional diagnostic in Developer Tools Console, while signed in as each player:
 
 ```js
-fetch('/api/core/bank/first-login', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ username: 'testbank_01', password: 'Temporary-Test-Password-84' })
-}).then(async r => console.log(r.status, await r.json()))
+fetch('/api/core/profile').then(async r => {
+  const d = await r.json();
+  console.log(r.status, {
+    bankSetup: d.profile?.bankSetup,
+    accountNumber: d.profile?.bank?.accountNumber,
+    balance: d.profile?.bank?.balance
+  });
+});
 ```
 
-- [ ] First setup returns HTTP 200 and `welcomeBonus: 500`.
-- [ ] `/api/core/profile` reports `bankSetup: true` and a balance of 500.
-- [ ] Repeating setup on the same account returns HTTP 409.
-
-The complete bank login UI/authentication flow is not implemented in this preview; test only the first-setup API here.
+Never paste bank passwords, session cookies or other credentials into reports. **Transfers remain deliberately disabled** in this preview until the server-side transfer/ledger implementation is added; do not test legacy local demo transfers as if they were persistent.
 
 ## E. Player-file API ownership
 

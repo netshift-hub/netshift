@@ -5559,7 +5559,7 @@ const netshiftCoreOriginalRenderComputer = renderComputer;
 renderComputer = async function() {
   const profile = await netshiftCoreLoadProfile();
   const shield = profile ? `<div class="box" style="grid-column:1/-1;border:2px solid #777"><h3 style="color:#55a64b">🛡 SafetyShield</h3><p style="color:#55a64b;font-weight:bold">${profile.safetyShield?'ON — PvP protected':'OFF — vulnerable to player hacks'}</p><p>NPC hackers can attack regardless of this setting. Changing SafetyShield starts a one-hour cooldown.</p><button class="bevel" onclick="netshiftCoreShieldDialog(${!profile.safetyShield})">Turn SafetyShield ${profile.safetyShield?'OFF':'ON'}…</button><p class="small">Server IP: ${esc(profile.ip)}</p></div>` : `<div class="box" style="grid-column:1/-1"><h3>🛡 SafetyShield</h3><p>Sign in to load your server-managed protection setting.</p></div>`;
-  page(frame(`${titlebar('MY COMPUTER — SYSTEM PROPERTIES')}<div class="cardgrid"><div class="box"><h3>CPU</h3><p>Level ${state.cpu}</p></div><div class="box"><h3>Connection</h3><p>Level ${state.connection}</p></div><div class="box"><h3>Firewall</h3><p>Local Firewall L${state.firewall} — active</p></div><div class="box"><h3>Anti-Malware</h3><p>${state.antimalware?'Installed and active':'Not installed'}</p></div><div class="box"><h3>Virtual IP</h3><p>${esc(profile?.ip || PLAYER_IP)}</p></div><div class="box"><h3>Bank account</h3><p>${state.accounts.player.number} · ${money(state.accounts.player.balance)}</p>${link('Open First Bank','firstbank.local')}</div>${shield}</div>`),'My Computer');
+  page(frame(`${titlebar('MY COMPUTER — SYSTEM PROPERTIES')}<div class="cardgrid"><div class="box"><h3>CPU</h3><p>Level ${state.cpu}</p></div><div class="box"><h3>Connection</h3><p>Level ${state.connection}</p></div><div class="box"><h3>Firewall</h3><p>Local Firewall L${state.firewall} — active</p></div><div class="box"><h3>Anti-Malware</h3><p>${state.antimalware?'Installed and active':'Not installed'}</p></div><div class="box"><h3>Virtual IP</h3><p>${esc(profile?.ip || PLAYER_IP)}</p></div><div class="box"><h3>Bank account</h3><p>${profile?.bank?.accountNumber ? esc(profile.bank.accountNumber) : 'Not available'} · ${money(profile?.bank?.balance ?? state.accounts.player.balance)}</p>${profile?.bankSetup ? '<p class="small">First Bank credentials created</p>' : '<p class="small">First Bank account setup required</p>'}${link('Open First Bank','firstbank.local')}</div>${shield}</div>`),'My Computer');
 };
 function netshiftRenderUserFolders(){
   const strip=document.getElementById('desktopIcons');if(!strip)return;
@@ -5581,5 +5581,63 @@ document.addEventListener('contextmenu', event=>{
   menu.innerHTML='<button onclick="netshiftDesktopCreate(\'file\');document.getElementById(\'contextMenu\').classList.add(\'hidden\')">New Text Document</button><button onclick="netshiftDesktopCreate(\'folder\');document.getElementById(\'contextMenu\').classList.add(\'hidden\')">New Folder</button>';
   menu.style.left=Math.min(event.clientX,window.innerWidth-220)+'px';menu.style.top=Math.min(event.clientY,window.innerHeight-100)+'px';menu.classList.remove('hidden');
 });
+
+
+
+// Core v2 First Bank UI: real player-scoped API; do not use the legacy local demo accounts.
+async function renderBankFront() {
+  state.currentSite = 'bank';
+  const profile = await netshiftCoreLoadProfile();
+  if (!profile) {
+    page(frame(`${titlebar('FIRST BANK ONLINE')}<div class="box"><h3>Sign in required</h3><p>Sign in to NETSHIFT Online before accessing your personal First Bank account.</p></div>`), 'First Bank');
+    return;
+  }
+  if (!profile.bankSetup) {
+    page(frame(`${titlebar('FIRST BANK ONLINE — OPEN YOUR ACCOUNT')}<div class="website-theme-v16" style="background:#edf5fb;color:#193e60;border-color:#a6bfd2"><div class="theme-hero">FIRST BANK ONLINE</div><p>Welcome to First Bank. Create your personal bank credentials to activate your account. This is separate from your NETSHIFT login.</p><p>Your account has a $500 opening balance. Your bank credentials are stored securely by the server.</p></div><div class="admin-panel"><h3>Open your First Bank account</h3><div class="formrow"><label for="coreBankNewUsername">Choose bank username</label><input id="coreBankNewUsername" autocomplete="off" maxlength="40" placeholder="3–40 letters, numbers or underscores"></div><div class="formrow"><label for="coreBankNewPassword">Choose bank password</label><input id="coreBankNewPassword" type="password" autocomplete="new-password" maxlength="128" placeholder="At least 8 characters"></div><p class="small">Choose credentials just for the fictional in-game bank; do not reuse a real password.</p><p><button class="bevel" onclick="netshiftBankCreateAccount()">Create First Bank account</button></p><p id="coreBankMessage" class="account-message" hidden></p></div>`), 'First Bank account setup');
+    return;
+  }
+  try {
+    const data = await netshiftApi('/api/core/bank/account');
+    const a = data.account;
+    page(frame(`${titlebar('FIRST BANK ONLINE — ACCOUNT OVERVIEW')}<div class="website-theme-v16" style="background:#edf5fb;color:#193e60;border-color:#a6bfd2"><div class="theme-hero">FIRST BANK ONLINE</div><p>Account holder: <b>${esc(a.username)}</b></p><p>Account number: <b>${esc(a.accountNumber)}</b></p><div class="bank-balance">${money(a.balance)}<div class="small">Available balance (USD)</div></div></div><div class="box"><h3>Account status</h3><p>Your account and balance are loaded from the server-side player record.</p><p class="software-warning">Bank transfers are not available in this v2 preview yet. Other shop and economy actions may still use legacy local state and are not yet connected to this balance.</p><button class="bevel" onclick="netshiftBankLogout()">Sign out of First Bank</button></div>`), 'First Bank account');
+  } catch (e) {
+    if (e.status === 401 && e.code === 'BANK_AUTH_REQUIRED') {
+      page(frame(`${titlebar('FIRST BANK ONLINE — CUSTOMER LOGIN')}<div class="website-theme-v16" style="background:#edf5fb;color:#193e60;border-color:#a6bfd2"><div class="theme-hero">FIRST BANK ONLINE</div><p>Sign in using your separate First Bank credentials.</p></div><div class="admin-panel"><h3>Customer login</h3><div class="formrow"><label for="coreBankUsername">Bank username</label><input id="coreBankUsername" autocomplete="username" maxlength="40" placeholder="First Bank username"></div><div class="formrow"><label for="coreBankPassword">Bank password</label><input id="coreBankPassword" type="password" autocomplete="current-password" maxlength="128" placeholder="First Bank password"></div><button class="bevel" onclick="netshiftBankLogin()">Secure login</button><p id="coreBankMessage" class="account-message" hidden></p></div>`), 'First Bank customer login');
+      return;
+    }
+    toast('First Bank could not load the account: ' + e.message);
+    page(frame(`${titlebar('FIRST BANK ONLINE — ERROR')}<div class="box"><p>Unable to load the bank account. Please try again.</p><p class="small">${esc(e.message)}</p><button class="bevel" onclick="renderBankFront()">Retry</button></div>`), 'First Bank error');
+  }
+}
+function netshiftBankShowMessage(message) {
+  const el = document.getElementById('coreBankMessage');
+  if (el) { el.textContent = message || ''; el.hidden = !message; }
+  else if (message) toast(message);
+}
+async function netshiftBankCreateAccount() {
+  const username = (document.getElementById('coreBankNewUsername')?.value || '').trim();
+  const password = document.getElementById('coreBankNewPassword')?.value || '';
+  try {
+    const result = await netshiftApi('/api/core/bank/first-login', { method: 'POST', body: JSON.stringify({ username, password }) });
+    await netshiftCoreLoadProfile();
+    toast(result.message || 'First Bank account created. Opening balance: $500.');
+    await renderBankFront();
+  } catch (e) { netshiftBankShowMessage(e.message); }
+}
+async function netshiftBankLogin() {
+  const username = (document.getElementById('coreBankUsername')?.value || '').trim();
+  const password = document.getElementById('coreBankPassword')?.value || '';
+  try {
+    await netshiftApi('/api/core/bank/login', { method: 'POST', body: JSON.stringify({ username, password }) });
+    toast('Signed in to First Bank.');
+    await renderBankFront();
+  } catch (e) { netshiftBankShowMessage(e.message); }
+}
+async function netshiftBankLogout() {
+  try { await netshiftApi('/api/core/bank/logout', { method: 'POST', body: JSON.stringify({}) }); }
+  catch (e) { toast('Bank sign-out failed: ' + e.message); return; }
+  toast('Signed out of First Bank.');
+  await renderBankFront();
+}
 
 </script></body></html>

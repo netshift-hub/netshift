@@ -5,7 +5,7 @@ This package is an incremental development build based on v1.3. It is **not yet 
 ## Implemented in this preview
 
 - Additive PostgreSQL schema for persistent player world profiles, stable simulated workstation IPs, player bank records, player files, shared-host inventory/loot claims, admin roles/audit events and account bans.
-- Player world profile creation on registration/login. First Bank player records are distinct from NPC account-file loot; the opening balance is $500. In-game bank password setup is exposed through `/api/core/bank/first-login` and stores a bcrypt hash.
+- Player world profile creation on registration/login. First Bank player records are distinct from NPC account-file loot; the opening balance is $500. First Bank account setup and customer login are connected to server APIs; passwords are stored as bcrypt hashes, and the UI/My Computer display the per-player server account number and balance. Bank transfers/ledger remain unfinished and are intentionally disabled in the preview.
 - SafetyShield UI in My Computer, ON by default, with Windows-style confirmation dialog and server-side one-hour change cooldown. PvE is not disabled by SafetyShield.
 - Authenticated file CRUD API for creating folders/text files, reading current player files, editing text, and soft-deleting files.
 - Atomic shared-host download claim endpoint. Concurrent attempts for the same stock item cannot both win; a losing attempt gets an availability error. The endpoint adds the claimed file/software to the player's server-side file inventory while preserving software family and level metadata.
@@ -31,7 +31,7 @@ This package is an incremental development build based on v1.3. It is **not yet 
 - Full PvP attack endpoint: target SafetyShield checks, Waterwall/Firewall inventory validation, 30-minute post-success immunity, allowed loot/deletion rules, attack audit events and concurrent attack tests.
 - Canonical player-to-player software gifting/trading and a single source of truth shared by existing gameplay UI and the new server-side file inventory.
 - Integrate existing NefariousUploader and all legacy download/upload flows with server-owned file/software IDs; the legacy browser UI still has local-state flows that are not yet fully migrated.
-- Correct and verify the legacy Warez L1–L5 upload bug, database file contents, bank account UI/login flow, connection-log deletion, Recycle Bin delete-all, draggable desktop positions, pinned WHOIS listings, and full right-click Explorer operations against the persistent API.
+- Correct and verify the legacy Warez L1–L5 upload bug, database file contents, transactional bank transfers/ledger, connection-log deletion, Recycle Bin delete-all, draggable desktop positions, pinned WHOIS listings, and full right-click Explorer operations against the persistent API.
 - NPC attacks on a server-side 15–60 minute schedule, real simulated NPC addresses, router admin intrusion logs and probability tuning. The ticker is only an initial regeneration foundation and still needs item-snapshot-based exact inventory restoration and money-loot transaction rules.
 - Regeneration based on the last successful intrusion, with full three-day credential lockout semantics, restart-safe scheduling, and tests that prove no duplicate stock or currency.
 - Enforce Firewall L1–L6 as actual defensive state and Waterwall L1–L6 as offensive state in every relevant legacy hack flow.

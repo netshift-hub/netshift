@@ -12,6 +12,9 @@ const requiredServer = [
   'CREATE TABLE IF NOT EXISTS netshift_world_host_inventory',
   "app.post('/api/core/safetyshield'",
   "app.post('/api/core/bank/first-login'",
+  "app.post('/api/core/bank/login'",
+  "app.get('/api/core/bank/account'",
+  "app.post('/api/core/bank/logout'",
   "app.post('/api/core/hosts/:slug/download'",
   "app.get('/api/admin/viewusers'",
   "app.post('/api/admin/:action/:username'",
@@ -23,6 +26,11 @@ const requiredServer = [
 ];
 const requiredClient = [
   'netshiftCoreShieldDialog',
+  'netshiftBankCreateAccount',
+  'netshiftBankLogin',
+  'netshiftBankLogout',
+  'profile?.bank?.accountNumber',
+  'FIRST BANK ONLINE — OPEN YOUR ACCOUNT',
   'one hour before you can enable SafetyShield again',
   'netshiftDesktopCreate',
   'New Text Document',
@@ -30,4 +38,4 @@ const requiredClient = [
 ];
 for (const marker of requiredServer) assert.ok(server.includes(marker), `server missing ${marker}`);
 for (const marker of requiredClient) assert.ok(html.includes(marker), `client missing ${marker}`);
-console.log('Core v2 schema, SafetyShield, files, shared downloads and admin API markers OK');
+console.log('Core v2 schema, SafetyShield, player files, bank UI/API, shared downloads and admin API markers OK');

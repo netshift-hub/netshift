@@ -449,6 +449,13 @@ const saveLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Autosave limit reached. Please wait a moment.' }
 });
+const bankLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many First Bank sign-in attempts. Please wait 15 minutes and try again.' }
+});
 const worldProbeLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: 20,
@@ -964,7 +971,7 @@ app.post('/api/core/safetyshield', requireAuth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 app.post('/api/core/bank/first-login', requireAuth, async (req, res, next) => {
-  const username = typeof req.body?.username === 'string' ? req.body.username.trim() : '';
+  const username = typeof req.body?.username === 'string' ? req.body.username.trim().toLowerCase() : '';
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
   if (!/^[a-zA-Z0-9_]{3,40}$/.test(username) || password.length < 8 || password.length > 128)
     return res.status(400).json({ error: 'Choose a bank username (3–40 letters/numbers/underscores) and password (8–128 characters).' });
@@ -983,8 +990,54 @@ app.post('/api/core/bank/first-login', requireAuth, async (req, res, next) => {
       await c.query('UPDATE netshift_bank_accounts SET account_username=$2, password_hash=$3 WHERE owner_user_id=$1', [req.session.user.id, username, hash]);
       await c.query('UPDATE netshift_player_world SET bank_setup_at=NOW() WHERE user_id=$1', [req.session.user.id]);
       await c.query('COMMIT');
+      // The successful first-visit setup also authenticates this bank session.
+      req.session.bankAuthenticatedFor = String(req.session.user.id);
+      await saveSession(req);
       res.json({ ok: true, welcomeBonus: 500, currency: 'USD', message: 'First Bank account activated. The one-time $500 welcome bonus is included in your opening balance.' });
     } catch (e) { try { await c.query('ROLLBACK'); } catch (_) {} if (e.message === 'Player profile missing.') return res.status(404).json({ error: e.message }); throw e; } finally { c.release(); }
+  } catch (e) { next(e); }
+});
+
+// First Bank customer authentication is tied to the already-authenticated NETSHIFT player.
+// Bank passwords are checked on the server and never returned to the client.
+app.post('/api/core/bank/login', bankLoginLimiter, requireAuth, async (req, res, next) => {
+  const username = typeof req.body?.username === 'string' ? req.body.username.trim().toLowerCase() : '';
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  if (!username || username.length > 40 || !password || password.length > 128)
+    return res.status(400).json({ error: 'Enter your First Bank username and password.' });
+  try {
+    if (!await requireSessionOwnership(req, res)) return;
+    const result = await pool.query(`SELECT account_username, password_hash FROM netshift_bank_accounts WHERE owner_user_id=$1`, [req.session.user.id]);
+    const account = result.rows[0];
+    if (!account || !account.password_hash)
+      return res.status(409).json({ error: 'Set up your First Bank account before signing in.', code: 'BANK_SETUP_REQUIRED' });
+    if (account.account_username !== username || !(await bcrypt.compare(password, account.password_hash)))
+      return res.status(401).json({ error: 'First Bank sign-in failed. Check your bank username and password.', code: 'BANK_LOGIN_FAILED' });
+    req.session.bankAuthenticatedFor = String(req.session.user.id);
+    await saveSession(req);
+    res.json({ ok: true, message: 'First Bank sign-in successful.' });
+  } catch (e) { next(e); }
+});
+app.get('/api/core/bank/account', requireAuth, async (req, res, next) => {
+  try {
+    if (!await requireSessionOwnership(req, res)) return;
+    if (req.session.bankAuthenticatedFor !== String(req.session.user.id))
+      return res.status(401).json({ error: 'Sign in to First Bank to view this account.', code: 'BANK_AUTH_REQUIRED' });
+    const result = await pool.query(`SELECT bank_code, account_number, account_username, balance_cents, password_hash
+      FROM netshift_bank_accounts WHERE owner_user_id=$1`, [req.session.user.id]);
+    const account = result.rows[0];
+    if (!account || !account.password_hash)
+      return res.status(409).json({ error: 'Set up your First Bank account before signing in.', code: 'BANK_SETUP_REQUIRED' });
+    res.json({ account: { bank: account.bank_code, accountNumber: account.account_number,
+      username: account.account_username, balance: Number(account.balance_cents) / 100, currency: 'USD' } });
+  } catch (e) { next(e); }
+});
+app.post('/api/core/bank/logout', requireAuth, async (req, res, next) => {
+  try {
+    if (!await requireSessionOwnership(req, res)) return;
+    delete req.session.bankAuthenticatedFor;
+    await saveSession(req);
+    res.json({ ok: true });
   } catch (e) { next(e); }
 });
 app.get('/api/core/files', requireAuth, async (req, res, next) => {

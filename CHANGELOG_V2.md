@@ -20,3 +20,10 @@
 - Allow a player's first SafetyShield change immediately; start the one-hour lock only after that change and persist the state across redeploys.
 - Tighten `.gitignore` to cover `.env.*` without ignoring `.env.example`.
 - Add a staging deployment guide and API-focused v2 preview acceptance checklist.
+
+## Staging follow-up — First Bank UI integration
+- Connected First Bank first-visit setup and subsequent customer login to server endpoints; bank passwords remain bcrypt-hashed server-side.
+- Added server-verified bank account session state and logout.
+- My Computer now displays account number/balance from `/api/core/profile` rather than the shared legacy `100001` demo account.
+- Removed local-demo transfers from the displayed bank dashboard until an atomic server-side transfer/ledger endpoint is implemented.
+- Expanded the staging bank checklist.
