@@ -109,10 +109,10 @@ function testInventoryHydrationKeepsTypesAndCanonicalCollectionsSeparate() {
     'only file rows enter the text-file mirror');
   assert.ok(loader.includes('type: row.item_type'), 'Recycle Bin preserves canonical item type');
   assert.ok(loader.includes('_coreFileId: row.id'), 'Recycle Bin retains canonical record ID');
-  assert.ok(loader.includes('state.owned = [...new Set([...legacyOwned, ...installedIds])];'),
-    'installed-software compatibility mirror derives canonical portion from server rows');
-  assert.ok(loader.includes('state.archiveSoftware = [...legacyArchive, ...archivedIds.map'),
-    'Archive compatibility mirror derives canonical portion from server rows');
+  assert.ok(loader.includes('state.owned = [...new Set(installedIds)];'),
+    'authenticated installed-software mirror contains only server-backed installed rows');
+  assert.ok(loader.includes('state.archiveSoftware = archivedIds.map'),
+    'authenticated Archive mirror contains only server-backed software rows');
   assert.ok(loader.includes('state.localFiles = previous.localFiles') && loader.includes('state.owned = previous.owned'),
     'failed refresh restores all mutated mirrors');
   assert.ok(loader.includes('!netshiftCoreIsShadowedLegacyFile(file, activeRows)'),
@@ -131,7 +131,7 @@ function testInventoryHydrationKeepsTypesAndCanonicalCollectionsSeparate() {
 function testViewsRenderCanonicalRecordIdsAndTypes() {
   const desktop = section(html, 'function refreshDesktopIcons() {', 'function netshiftCoreRenderDesktopFile(');
   assert.ok(desktop.includes('NETSHIFT_CORE_SOFTWARE'), 'Desktop installed-software view uses canonical software rows');
-  assert.ok(desktop.includes('!netshiftCoreIsShadowedLegacyFile(file)'), 'Desktop filters only legacy demo/duplicate files');
+  assert.ok(desktop.includes('!netshiftCoreIsShadowedLegacyFile(file)'), 'Desktop filters out legacy-only rows for authenticated accounts');
   assert.ok(!desktop.includes("file.name !== 'bank-info.txt'"), 'Desktop does not hide a legitimate canonical bank-info.txt record');
   assert.ok(desktop.includes('data-core-record-id='), 'canonical software DOM retains its server record ID');
   assert.ok(desktop.includes('netshiftCoreRenderDesktopFile(file)'), 'canonical desktop files render from the file model');
@@ -157,8 +157,8 @@ function testViewsRenderCanonicalRecordIdsAndTypes() {
   const canonicalNote = { id: 'note-canonical', item_type: 'file', name: 'notes.txt', parent_path: '/' };
   assert.equal(shadowHelper({ name: 'notes.txt' }, [canonicalNote]), true,
     'a duplicate legacy mirror is shadowed when it matches a canonical filename and location');
-  assert.equal(shadowHelper({ name: 'other.txt' }, [canonicalNote]), false,
-    'unrelated legacy-only file rows are not hidden by canonical inventory');
+  assert.equal(shadowHelper({ name: 'other.txt' }, [canonicalNote]), true,
+    'authenticated accounts hide unrelated legacy-only file rows, not just duplicates');
 
   const softwareSection = section(html, 'function netshiftCoreRenderSoftwareRow(item, location) {', 'function netshiftCoreRenderFolderRow(');
   const softwareRenderer = new Function('software', 'netshiftCoreInlineArg', 'esc', 'renderSoftwareRowV16',

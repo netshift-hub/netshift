@@ -270,3 +270,57 @@ Review the entire codebase, not only the current Core v2 endpoints, and inventor
 - [ ] Recycle and restore known software and an unknown software family; ensure the underlying server row ID is preserved and no duplicate row is created.
 
 **Important limitation:** source-level tests and `npm run check` do not satisfy this section. Record any runtime result only after running against the intended disposable staging service and database; never run destructive migration tests against production.
+
+## L. Stage 1 Chunk 9 — authenticated inventory authority fence (local implementation; staging tests pending)
+
+Run only against the intended disposable staging deployment. Use two disposable player accounts in separate browser profiles.
+
+- [ ] Log in as Account A and confirm Desktop, Downloads, Archive, folders and Recycle Bin show only canonical records returned by the Core APIs; no browser-only default/demo inventory is rendered.
+- [ ] Open a canonical text file by its server record ID; rename/edit/save it and confirm the same ID, name, content and `parent_path` are returned by `GET /api/core/files` after refresh and relogin. Duplicate filenames in different folders must open the selected record, not an arbitrary same-name entry.
+- [ ] Attempt legacy website downloads, local software installation, local-only software execution, and legacy shop purchase while signed in. Each action must be refused with a clear message and must not alter canonical inventory or the server-backed bank balance. Use World → currently controlled host → Available downloads for supported software/file claims.
+- [ ] Try legacy drag/drop, context actions, file opening, restore, permanent delete and empty-Recycle-Bin using a local-only item. The local-only item must not be rendered or accepted as an authenticated inventory record.
+- [ ] Confirm canonical software is runnable only while its matching canonical record is located on Desktop. Moving it through the server API to Downloads/Archive disables execution; installing it through the server-backed action restores it to Desktop.
+- [ ] Account B cannot view or mutate Account A's canonical files, software locations or Recycle Bin rows. Verify API responses and persistence after reload; do not rely on the UI alone.
+- [ ] Confirm offline/no-account prototype still has its prior local-only download and inventory behavior.
+
+**Limit:** automated checks are static/helper checks, not browser/DB integration tests. Chunk 9 does not make banking/economy, malware, NPC/security sweeps, attack outcomes or admin access fully server-authoritative. Record staging results before proceeding to Chunk 10 sign-off.
+
+## M. Stage 1 Chunk 10 — final regression and acceptance gate
+
+**Current status: NOT SIGNED OFF.** The local automated suite is required but is not sufficient for release. Record actual results and evidence; do not turn a test green based only on a static source marker or a mock SQL adapter.
+
+### M1. Test layers and commands
+
+- [ ] **Local deterministic checks:** run `npm run check` on the exact candidate commit. Save the full terminal output and candidate commit SHA. This includes the save-cutover contract, preferences-only save protocol, hydration gate, canonical inventory views, Chunk 9 legacy-inventory fence, loot-regeneration policies, host-claim mock transaction tests, and the Chunk 10 coverage/wiring audit.
+- [ ] **Real PostgreSQL integration:** run `npm run test:stage1:postgres` only against a newly created, disposable PostgreSQL database. The script uses an isolated randomly named schema and drops only that schema. It never falls back to the application's `DATABASE_URL`; Render hostnames are refused. See the checkpoint for the explicit environment/acknowledgement variables. Record output, database host class (local/remote only), and test schema name; never record the URL or credentials.
+- [ ] **Staging runtime:** deploy only to the intended staging service/database after confirming branch, commit and database identity independently. Use two disposable accounts and the browser checks below. Do not use production for destructive/conflict/concurrency scenarios.
+
+### M2. Acceptance matrix — all six areas require evidence
+
+| ID | Scope | Required evidence | Status |
+|---|---|---|---|
+| T1 | Legacy save cutover and protected-state integrity | Automated cutover tests pass; disposable PostgreSQL confirms reset is scoped to legacy save rows and canonical bank/profile/file/world fixtures remain unchanged; stale schema-v1 writes are rejected | [ ] Pending |
+| T2 | Authentication, session ownership and hydration | Account A/B sign-in; failed/malformed required hydration blocks gameplay and autosave; stale/replaced sessions cannot write; valid retry resumes only after required reads succeed | [ ] Pending |
+| T3 | Canonical files and legacy-path fencing | Create/edit/rename/move-to-Recycle/restore/permanently-delete via supported API; refresh/relogin consistency; signed-in legacy local-only download/install/purchase/recycle actions do not fabricate records; offline prototype still works | [ ] Pending |
+| T4 | Shared-host claim and loot regeneration | PostgreSQL success/rollback/concurrency tests; Account A current controller can claim exactly once; Account B cannot claim/read controller-only stock; static content preserved, cap 3 website/5 NPC and generated IDs/metadata verified on staging | [ ] Pending |
+| T5 | Cross-account security and protected-state audit | A's private files/bank state absent to B; B cannot mutate A's records; revoked session and non-controller cannot claim; admin endpoint remains forbidden to regular account; deferred systems remain explicitly unsupported | [ ] Pending |
+| T6 | Release gate and evidence quality | Candidate SHA, `npm run check` log, PostgreSQL log (or an explicit blocker), staging deployment ID/SHA, redacted two-account results, unresolved defects, owner sign-off | [ ] Pending |
+
+### M3. Two-account browser protocol (staging only)
+
+Use labels **Account A** and **Account B** in evidence. Do not include passwords, cookie values, session IDs, bank passwords, `DATABASE_URL`, or `SESSION_SECRET`.
+
+- [ ] A creates a uniquely named canonical text file, edits it, renames it, sends it to Recycle Bin, restores it, then permanently deletes it using supported UI/API actions. Reload and sign out/in at each relevant checkpoint; record canonical API status codes and row counts.
+- [ ] B cannot read, edit, rename, restore, or permanently delete A's private file. Expected denial for a missing/foreign Core file remains HTTP 404 where the route intentionally conceals ownership.
+- [ ] A controls a test host before listing and claiming stock. A claims one current item; the item disappears from host stock and appears exactly once in A's canonical `/downloads`. B is unable to read controller-only host inventory or claim stock. Replaying a consumed ID cannot award a second file.
+- [ ] Cause a filename conflict and two simultaneous claim requests only on disposable staging. The conflict must leave stock, inventory version, claim ledger and player inventory unchanged; the concurrency test must have exactly one successful claimant.
+- [ ] Verify legacy save v1 cannot overwrite canonical state. Check account identity, bank/profile setup, file rows and world records remain intact across the save cutover/startup path.
+- [ ] Record the UI behaviour for signed-in legacy download/install/shop/recycle handlers that have no canonical replacement: the action must be blocked/ignored rather than creating local-only inventory. Confirm the non-authenticated offline prototype remains usable.
+
+### M4. Evidence recording template
+
+For each test, record: `ID`, date/time UTC, candidate commit SHA, environment (local/disposable DB/staging), account label (A/B), action, expected result, actual result, HTTP status/error code where relevant, record counts/versions before and after, PASS/FAIL/BLOCKED, and redacted evidence/log reference. A test that was not executed is **BLOCKED/NOT RUN**, never PASS.
+
+### M5. Explicit release boundary
+
+Even if T1–T6 pass, this is only Stage 1 acceptance. Do not claim that bank transfers/economy, complete PvP/hacking outcomes, NPC attack scheduling/security sweeps, full software gifting/effects, email delivery/password reset, administrator MFA enforcement, or multi-instance Render cross-instance behaviour are complete. Keep a defect or deferred-work entry for each unresolved item.

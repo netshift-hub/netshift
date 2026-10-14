@@ -118,3 +118,14 @@
 - Added active account-session ownership and current host-control checks, a safe owner-only inventory read route, strict stock metadata validation, rejection of duplicate/reintroduced item IDs, and a rate-limited download mutation endpoint.
 - Connected the shared-host UI to the inventory/download routes and reloads the canonical player files after a successful claim.
 - Added `scripts/check-stage1-host-download-claim.js` to `npm run check`; the full local check suite passes. Mock SQL-adapter coverage is not proof of PostgreSQL transaction semantics. Live PostgreSQL and two-account browser testing remain outstanding. Remaining legacy client download writers are Chunk 9.
+
+
+## Stage 1 — Chunk 9 legacy inventory authority fence (local only)
+- Authenticated inventory hydration discards unmatched browser-only file, software, folder and Recycle Bin rows rather than treating local arrays as a second source of ownership. Canonical record IDs and server paths remain the basis of authenticated views.
+- Fenced legacy local software install/run, website downloads, software downloads/purchases, local-file opening, drag/drop, context actions and Recycle Bin mutation paths for signed-in accounts. Canonical operations continue through the Core file/host-claim APIs; the offline prototype keeps its legacy paths.
+- Added `scripts/check-stage1-legacy-inventory-fence.js` to the automated local check suite. Runtime PostgreSQL/browser validation has not been performed; banking, economy, hardware upgrades, malware and hacking outcomes remain separate outstanding state-authority work.
+
+## Stage 1 Chunk 10 — regression/acceptance gate (prepared locally, not deployed)
+- Added `scripts/check-stage1-acceptance.js` to the standard deterministic suite to verify test coverage/wiring for legacy-save safety, authenticated hydration, canonical inventory/legacy fencing, atomic claims/loot rules, cross-account evidence and release sign-off.
+- Added opt-in `scripts/test-stage1-postgres.js` for real PostgreSQL host-claim commit, filename-conflict rollback, simultaneous single-winner claims, revoked/non-controller access and consumed-ID replay. It requires a dedicated `NETSHIFT_STAGE1_TEST_DATABASE_URL`, explicit disposable-database acknowledgement, refuses Render hosts, and creates/drops only a uniquely named isolated schema.
+- Expanded the staging checklist and ownership audit with T1–T6 evidence mapping and explicit PASS/FAIL/BLOCKED rules. PostgreSQL and browser/staging checks remain pending until actually executed; this chunk does not sign off Stage 1.

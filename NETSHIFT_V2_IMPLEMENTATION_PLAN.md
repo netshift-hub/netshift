@@ -46,8 +46,8 @@ The following smaller-chunk sequence supersedes older, broader chunk groupings f
 | 6 | Gate authenticated gameplay and autosaving on successful profile and canonical inventory hydration | Implemented locally in this checkpoint; browser runtime validation remains outstanding |
 | 7 | Reconcile canonical files/software with Desktop, Downloads, Archive, Recycle Bin and installed-software views without duplicating records | Implemented locally; static/helper checks pass; browser/PostgreSQL verification pending |
 | 8 | Make host-stock claim, claim ledger and canonical player-file delivery atomic, including filename-conflict rollback and concurrency tests | Implemented locally; mocked transaction/static checks pass; PostgreSQL/browser validation pending |
-| 9 | Reconcile or retire remaining legacy browser-side inventory/download/folder/recycle writers so they cannot create competing authority | Pending |
-| 10 | Run final Stage 1 regression/acceptance checks and update the ownership matrix with evidence | Pending; Stage 1 cannot be declared complete before this gate |
+| 9 | Reconcile or retire remaining legacy browser-side inventory/download/folder/recycle writers so they cannot create competing authority | Implemented locally; static checks pass; browser/PostgreSQL staging verification pending |
+| 10 | Run final Stage 1 regression/acceptance checks and update the ownership matrix with evidence | Local gate and opt-in PostgreSQL test harness prepared; actual suite execution, PostgreSQL/browser staging evidence, and owner sign-off pending. Stage 1 cannot be declared complete before this gate |
 
 The chunks are small by design. A locally passing static suite does not establish PostgreSQL behaviour, browser correctness, account isolation or launch readiness. The project owner controls GitHub operations and deployment.
 
@@ -201,3 +201,13 @@ Build email on the server-side identity, file and malware foundations, not as an
 - The legacy filename-keyed `state.localFileFolders` map is now transitional-only; canonical path state comes from each server record's `parent_path`. Canonical Notepad saves and hydration no longer write canonical paths into that ambiguous map. Authenticated hydration discards the legacy fictional `bank-info.txt` demo item while leaving any canonical server-owned record with that name visible.
 - Added `scripts/check-stage1-canonical-inventory.js` to the standard check suite. Local tests cover typed mapping, record ID preservation, view wiring/rendering, unknown catalogue families, legacy duplicate hiding, software location route markers, restore precedence and invalid path rejection.
 - Validation: full `npm run check` passes locally. These are static/helper tests, not a browser test; no PostgreSQL, live staging, two-account browser, GitHub write or deployment occurred. Folder move/rename/delete remains deliberately disabled until a safe atomic subtree/path operation is designed. Chunk 8 now implements the local atomic host-download path; remaining legacy writers remain Chunk 9.
+
+
+## Stage 1 — Chunk 9 legacy inventory writer fence (local only, 2026-10-14)
+
+- Authenticated inventory hydration now rebuilds files, software ownership, folders and Recycle Bin strictly from canonical server rows; unmatched legacy browser arrays are not carried into the signed-in inventory.
+- Authenticated views hide any local-only file/software/folder/Recycle Bin item without a canonical server record ID. The ambiguous filename-keyed location map is cleared during authenticated hydration.
+- Legacy software installation, website/server file downloads, software downloads and purchases are retired for signed-in accounts. A signed-in account can run software only when the canonical inventory contains that software in Desktop; `ownedFamily` resolves against canonical installed rows. Offline prototype behaviour remains available when no account is signed in.
+- Legacy context actions, drag/drop, local-file opening and Recycle Bin actions are fenced. Canonical restore/permanent-delete and bulk deletion use the existing owner-scoped Core file API; folders remain excluded from bulk permanent deletion because atomic subtree handling is not implemented.
+- Added `scripts/check-stage1-legacy-inventory-fence.js` to `npm run check` and updated the canonical-inventory regressions for the new canonical-only policy.
+- Validation is local static/helper validation only. PostgreSQL, browser, two-account staging and deployed behavior remain unverified. This chunk intentionally does not migrate banking/economy, malware, attack outcomes, hardware upgrades or admin MFA. Do not declare Stage 1 complete; Chunk 10 and staging acceptance remain outstanding.

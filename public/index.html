@@ -4800,13 +4800,6 @@ function adminLogoutV16(site){
  renderFrontV16(site);
 }
 
-// Initialise canonical inventory mirrors before the first desktop render. The active
-// refreshDesktopIcons implementation reads these bindings during startup.
-let NETSHIFT_CORE_FILES = [];
-let NETSHIFT_CORE_SOFTWARE = [];
-let NETSHIFT_CORE_FOLDERS = [];
-let NETSHIFT_CORE_RECYCLE_FILES = [];
-
 if(!activeBrowserSurfaceV16) initBrowserTabsV16();
 updateDesktopShortcutsV16();
 refreshDesktopIcons();
@@ -5904,6 +5897,10 @@ async function netshiftBankLogout() {
 // Core v2 canonical file/desktop integration. The browser arrays below are mirrors only:
 // each canonical item retains its server record ID, type and parent path so views/actions
 // cannot accidentally substitute a legacy row with the same visible filename.
+let NETSHIFT_CORE_FILES = [];
+let NETSHIFT_CORE_SOFTWARE = [];
+let NETSHIFT_CORE_FOLDERS = [];
+let NETSHIFT_CORE_RECYCLE_FILES = [];
 function netshiftCoreFolderLocation(parentPath) {
   const path = typeof parentPath === 'string' && parentPath ? parentPath : '/';
   if (path === '/' || path === '/desktop') return 'desktop';
@@ -6026,12 +6023,13 @@ async function netshiftCoreLoadFiles({ quiet = false, required = false } = {}) {
     // Build every view-model before mutating any live mirror. Canonical software and
     // folders stay in their own typed collections; only actual text/file records enter
     // state.localFiles. Recycle Bin type is preserved from the server row.
-    let nextLocalFiles = (Array.isArray(state.localFiles) ? state.localFiles : []).filter(file =>
-      !file?._coreFileId && !(window.NETSHIFT_USER && file?.name === 'bank-info.txt') &&
-      !netshiftCoreIsShadowedLegacyFile(file, activeRows));
-    const nextLocalFileFolders = { ...(state.localFileFolders || {}) };
-    let nextFolders = (Array.isArray(state.userFoldersV2) ? state.userFoldersV2 : []).filter(folder => !folder?._coreFolderId);
-    let nextRecycle = (Array.isArray(state.recycleBin) ? state.recycleBin : []).filter(entry => !entry?._coreFileId);
+    // Authenticated inventory is rebuilt exclusively from server rows. The legacy
+    // browser arrays remain available only to the offline/local prototype path.
+    let nextLocalFiles = window.NETSHIFT_USER ? [] : (Array.isArray(state.localFiles) ? state.localFiles : []).filter(file =>
+      !file?._coreFileId && !netshiftCoreIsShadowedLegacyFile(file, activeRows));
+    const nextLocalFileFolders = window.NETSHIFT_USER ? {} : { ...(state.localFileFolders || {}) };
+    let nextFolders = window.NETSHIFT_USER ? [] : (Array.isArray(state.userFoldersV2) ? state.userFoldersV2 : []).filter(folder => !folder?._coreFolderId);
+    let nextRecycle = window.NETSHIFT_USER ? [] : (Array.isArray(state.recycleBin) ? state.recycleBin : []).filter(entry => !entry?._coreFileId);
     const nextSoftware = [];
     const nextCoreFolders = [];
     for (const row of activeRows) {
@@ -6075,10 +6073,10 @@ async function netshiftCoreLoadFiles({ quiet = false, required = false } = {}) {
       const canonicalIds = new Set(nextSoftware.filter(item => item.softwareId).map(item => item.softwareId));
       const installedIds = nextSoftware.filter(item => ['desktop'].includes(item._coreLocation) && item.softwareId).map(item => item.softwareId);
       const archivedIds = [...new Set(nextSoftware.filter(item => item._coreLocation === 'archive' && item.softwareId).map(item => item.softwareId))];
-      const legacyOwned = (Array.isArray(state.owned) ? state.owned : []).filter(id => !canonicalIds.has(id));
-      const legacyArchive = (Array.isArray(state.archiveSoftware) ? state.archiveSoftware : []).filter(item => !canonicalIds.has(item?.id));
-      state.owned = [...new Set([...legacyOwned, ...installedIds])];
-      state.archiveSoftware = [...legacyArchive, ...archivedIds.map(id => ({ id, archivedAt: Date.now() }))];
+      // Do not carry a browser-only ownership claim across a successful server load.
+      // Every installed/archive item that remains visible must have a canonical row.
+      state.owned = [...new Set(installedIds)];
+      state.archiveSoftware = archivedIds.map(id => ({ id, archivedAt: Date.now() }));
     }
     refreshDesktopIcons();
     refreshExplorerV11();
@@ -6114,8 +6112,9 @@ async function netshiftCoreLoadFiles({ quiet = false, required = false } = {}) {
 }
 function netshiftCoreTakenName(name, parentPath = '/') {
   // PostgreSQL enforces the active-name constraint across files, folders and software.
+  // Filename-keyed legacy maps are ambiguous and are not part of authenticated naming.
   return NETSHIFT_CORE_FILES.some(file => file.name.toLowerCase() === name.toLowerCase() && file.parent_path === parentPath) ||
-    state.localFiles.some(file => !file?._coreFileId && file.name.toLowerCase() === name.toLowerCase() && (state.localFileFolders?.[file.name] || (file.name === 'bank-info.txt' ? 'desktop' : 'downloads')) === netshiftCoreFolderLocation(parentPath));
+    (!window.NETSHIFT_USER && state.localFiles.some(file => !file?._coreFileId && file.name.toLowerCase() === name.toLowerCase() && (state.localFileFolders?.[file.name] || (file.name === 'bank-info.txt' ? 'desktop' : 'downloads')) === netshiftCoreFolderLocation(parentPath)));
 }
 function netshiftCoreUniqueUntitledName(parentPath = '/') {
   let i = 1;
@@ -6210,7 +6209,7 @@ netshiftRenderUserFolders = function() {
   const strip = document.getElementById('desktopIcons');
   if (!strip) return;
   strip.querySelectorAll('[data-user-folder-v2]').forEach(node => node.remove());
-  (state.userFoldersV2 || []).forEach(folder => {
+  (state.userFoldersV2 || []).filter(folder => !window.NETSHIFT_USER || !!folder?._coreFolderId).forEach(folder => {
     const el = document.createElement('div'); el.className = 'deskicon'; el.dataset.userFolderV2 = folder.name;
     el.innerHTML = '<span>📁</span>' + esc(folder.name); el.title = 'User folder';
     el.ondblclick = () => openExplorerWindow(folder._coreFolderPath ? 'custom:' + folder.name : 'desktop');
@@ -6317,8 +6316,9 @@ function netshiftCoreSoftwareAt(location) {
 }
 function netshiftCoreSoftwareRowsForView(location) {
   const canonical = netshiftCoreSoftwareAt(location);
+  if (window.NETSHIFT_USER) return canonical;
   const canonicalIds = new Set(NETSHIFT_CORE_SOFTWARE.map(item => item.softwareId).filter(Boolean));
-  if (!window.NETSHIFT_USER && location === 'desktop') {
+  if (location === 'desktop') {
     return canonical;
   }
   const legacyIds = location === 'desktop'
@@ -6423,10 +6423,9 @@ async function netshiftCoreItemAction(action, recordId, explicitParentPath = nul
 function netshiftCoreEffectiveFileLocation(file) { return netshiftCoreLocalFileLocation(file); }
 function netshiftCoreIsShadowedLegacyFile(file, canonicalRows = NETSHIFT_CORE_FILES) {
   if (!file || file._coreFileId) return false;
-  // The legacy bank-info.txt was a tutorial/demo file containing fictional credentials.
-  // The approved save cutover discards it for authenticated accounts, but must not hide
-  // a legitimate canonical server-owned file with that same filename.
-  if (window.NETSHIFT_USER && file.name === 'bank-info.txt') return true;
+  // For signed-in accounts, every inventory row without a canonical server ID is a
+  // legacy/cache artifact. Never expose it as a second inventory authority.
+  if (window.NETSHIFT_USER) return true;
   const location = netshiftCoreEffectiveFileLocation(file);
   return (Array.isArray(canonicalRows) ? canonicalRows : []).some(row => {
     if (!row || row.item_type !== 'file' || row.name !== file.name) return false;
@@ -6481,7 +6480,8 @@ renderExplorerContent = function renderExplorerContent() {
   const heading = tabs.find(([key]) => key === folder)?.[1] || (folder.startsWith('custom:') ? folder.slice(7) : 'Desktop');
   let content = '';
   if (folder === 'recycle') {
-    content = (state.recycleBin || []).map((entry, index) => renderRecycleRowV16(entry,index)).join('');
+    const recycleRows = (state.recycleBin || []).filter(entry => !window.NETSHIFT_USER || !!entry?._coreFileId);
+    content = recycleRows.map((entry) => renderRecycleRowV16(entry, state.recycleBin.indexOf(entry))).join('');
   } else {
     const parentPath = netshiftCoreParentPathForLocation(folder);
     const localFiles = (state.localFiles || []).filter(file => !netshiftCoreIsShadowedLegacyFile(file) && netshiftCoreEffectiveFileLocation(file) === folder && (!folder.startsWith('custom:') || netshiftCoreRecordParentPath(file) === parentPath));
@@ -6489,14 +6489,18 @@ renderExplorerContent = function renderExplorerContent() {
     if (folder === 'desktop') {
       content += netshiftCoreSoftwareRowsForView('desktop').map(item => item._legacySoftware ? renderSoftwareRowV16(item.softwareId,false) : netshiftCoreRenderSoftwareRow(item,folder)).join('');
       content += NETSHIFT_CORE_FOLDERS.filter(item => (item._coreParentPath || '/') === '/').map(netshiftCoreRenderFolderRow).join('');
-      content += (state.userFoldersV2 || []).filter(item => !item?._coreFolderId).map(item => `<div class="explorer-row"><div class="fileicon">📁</div><div class="fileinfo"><strong>${esc(item.name)}</strong><small>Temporary local folder</small></div></div>`).join('');
+      if (!window.NETSHIFT_USER) {
+        content += (state.userFoldersV2 || []).filter(item => !item?._coreFolderId).map(item => `<div class="explorer-row"><div class="fileicon">📁</div><div class="fileinfo"><strong>${esc(item.name)}</strong><small>Temporary local folder</small></div></div>`).join('');
+      }
     } else if (folder === 'downloads') {
       content += netshiftCoreSoftwareAt('downloads').map(item => netshiftCoreRenderSoftwareRow(item,folder)).join('');
     } else if (folder === 'archive') {
       const archivedFiles = (state.localFiles || []).filter(file => netshiftCoreEffectiveFileLocation(file) === 'archive');
       // localFiles content is already filtered above; only append archived software and legacy archive items.
       content += netshiftCoreSoftwareAt('archive').map(item => netshiftCoreRenderSoftwareRow(item,folder)).join('');
-      content += (state.archiveSoftware || []).filter(item => !item?._coreFileId && !NETSHIFT_CORE_SOFTWARE.some(core => core.softwareId === item?.id)).map(item => renderSoftwareRowV16(item.id,true)).join('');
+      if (!window.NETSHIFT_USER) {
+        content += (state.archiveSoftware || []).filter(item => !item?._coreFileId && !NETSHIFT_CORE_SOFTWARE.some(core => core.softwareId === item?.id)).map(item => renderSoftwareRowV16(item.id,true)).join('');
+      }
     } else if (folder.startsWith('custom:')) {
       content += NETSHIFT_CORE_SOFTWARE.filter(item => item._coreParentPath === parentPath).map(item => netshiftCoreRenderSoftwareRow(item,folder)).join('');
       content += NETSHIFT_CORE_FOLDERS.filter(item => item._coreParentPath === parentPath).map(netshiftCoreRenderFolderRow).join('');
@@ -6514,7 +6518,7 @@ renderExplorerContent = function renderExplorerContent() {
 netshiftRenderUserFolders = function netshiftRenderUserFolders() {
   const strip = document.getElementById('desktopIcons'); if (!strip) return;
   strip.querySelectorAll('[data-user-folder-v2]').forEach(node => node.remove());
-  (state.userFoldersV2 || []).forEach(folder => {
+  (state.userFoldersV2 || []).filter(folder => !window.NETSHIFT_USER || !!folder?._coreFolderId).forEach(folder => {
     const el = document.createElement('div'); el.className = 'deskicon'; el.dataset.userFolderV2 = folder.name;
     el.innerHTML = '<span>📁</span>' + esc(folder.name); el.title = folder._coreFolderId ? 'Server-owned folder' : 'Temporary local folder';
     if (folder._coreFolderId) el.ondblclick = () => openExplorerWindow('custom:' + (folder._coreFolderPath || ('/' + folder.name)));
@@ -6573,5 +6577,163 @@ async function netshiftForceConnect() {
     button.hidden = error.code !== 'ACTIVE_SESSION_UNREACHABLE';
   } finally { button.disabled = false; }
 }
+
+
+
+// Stage 1 Chunk 9: retire unauthoritative inventory mutation paths for signed-in users.
+// The original single-player prototype remains available when no NETSHIFT account is active.
+// Authenticated inventory mutations must use /api/core/files or the host-claim API.
+function netshiftStage1BlockLegacyInventoryWrite(message = 'This legacy inventory action is no longer available for signed-in accounts. Use the server-backed inventory instead.') {
+  toast(message);
+  return false;
+}
+
+var netshiftStage1PreviousOwnedFamily = ownedFamily;
+ownedFamily = function(family) {
+  if (!window.NETSHIFT_USER) return netshiftStage1PreviousOwnedFamily(family);
+  const matches = NETSHIFT_CORE_SOFTWARE.filter(item => item._coreLocation === 'desktop' && item.softwareId && software[item.softwareId]?.family === family);
+  matches.sort((a, b) => Number(software[b.softwareId]?.level || 0) - Number(software[a.softwareId]?.level || 0));
+  return matches[0]?.softwareId || null;
+};
+
+var netshiftStage1PreviousRunSoftware = runSoftware;
+runSoftware = function(id, ...args) {
+  if (window.NETSHIFT_USER && !NETSHIFT_CORE_SOFTWARE.some(item => item.softwareId === id && item._coreLocation === 'desktop')) {
+    return netshiftStage1BlockLegacyInventoryWrite('This software is not installed in your server-backed Desktop inventory.');
+  }
+  return netshiftStage1PreviousRunSoftware(id, ...args);
+};
+
+var netshiftStage1PreviousInstallSoftwareLocally = installSoftwareLocally;
+installSoftwareLocally = function(id, ...args) {
+  if (window.NETSHIFT_USER) return netshiftStage1BlockLegacyInventoryWrite('Software installation must use the server-backed Downloads or Archive action.');
+  return netshiftStage1PreviousInstallSoftwareLocally(id, ...args);
+};
+
+var netshiftStage1PreviousCompleteNetworkDownload = completeNetworkDownloadV11;
+completeNetworkDownloadV11 = function(job, ...args) {
+  if (window.NETSHIFT_USER) return netshiftStage1BlockLegacyInventoryWrite('Legacy website downloads are retired for signed-in accounts. Use World → controlled host → Available downloads.');
+  return netshiftStage1PreviousCompleteNetworkDownload(job, ...args);
+};
+
+var netshiftStage1PreviousQueueNetworkDownload = queueNetworkDownloadV11;
+queueNetworkDownloadV11 = function(...args) {
+  if (window.NETSHIFT_USER) return netshiftStage1BlockLegacyInventoryWrite('Legacy website downloads are retired for signed-in accounts. Use World → controlled host → Available downloads.');
+  return netshiftStage1PreviousQueueNetworkDownload(...args);
+};
+
+var netshiftStage1PreviousDownloadServerFile = downloadServerFile;
+downloadServerFile = function(...args) {
+  if (window.NETSHIFT_USER) return netshiftStage1BlockLegacyInventoryWrite('Legacy website downloads are retired for signed-in accounts. Use World → controlled host → Available downloads.');
+  return netshiftStage1PreviousDownloadServerFile(...args);
+};
+
+var netshiftStage1PreviousDownloadSoftware = downloadSoftware;
+downloadSoftware = function(...args) {
+  if (window.NETSHIFT_USER) return netshiftStage1BlockLegacyInventoryWrite('Software downloads must come from server-owned shared-host stock.');
+  return netshiftStage1PreviousDownloadSoftware(...args);
+};
+
+var netshiftStage1PreviousBuySoftware = buySoftware;
+buySoftware = function(...args) {
+  if (window.NETSHIFT_USER) return netshiftStage1BlockLegacyInventoryWrite('Software purchases are disabled until the server-side shop and ledger are implemented. No balance or inventory was changed.');
+  return netshiftStage1PreviousBuySoftware(...args);
+};
+
+var netshiftStage1PreviousOpenLocalFile = openLocalFileV11;
+openLocalFileV11 = function(file, ...args) {
+  if (window.NETSHIFT_USER) {
+    if (file?._coreFileId && file._coreItemType === 'file') return netshiftOpenCoreNotepad(file);
+    return netshiftStage1BlockLegacyInventoryWrite('This file has no server record and cannot be opened by a signed-in account.');
+  }
+  return netshiftStage1PreviousOpenLocalFile(file, ...args);
+};
+
+var netshiftStage1PreviousOpenLocalFileByName = openLocalFileByNameV11;
+openLocalFileByNameV11 = function(name, ...args) {
+  if (window.NETSHIFT_USER) {
+    const matches = NETSHIFT_CORE_FILES.filter(row => row.item_type === 'file' && row.name === name);
+    if (matches.length !== 1) return netshiftStage1BlockLegacyInventoryWrite(matches.length > 1
+      ? 'More than one server-backed file has that name. Open it from its specific folder.'
+      : 'That file has no server record.');
+    const file = state.localFiles.find(item => item?._coreFileId === matches[0].id);
+    if (!file) return netshiftStage1BlockLegacyInventoryWrite('The server-backed file is not in the current inventory. Refresh and try again.');
+    return netshiftOpenCoreNotepad(file);
+  }
+  return netshiftStage1PreviousOpenLocalFileByName(name, ...args);
+};
+
+var netshiftStage1PreviousContextAction = contextAction;
+contextAction = function(action, type, site, key, ...args) {
+  if (window.NETSHIFT_USER) {
+    if (type === 'localFile') {
+      const file = state.localFiles.find(item => item?.name === key);
+      if (!file?._coreFileId) return netshiftStage1BlockLegacyInventoryWrite('This local-only file is retired.');
+      if (action !== 'open' && action !== 'delete') return netshiftStage1BlockLegacyInventoryWrite();
+    } else if (type === 'localSoftware' || type === 'archiveSoftware') {
+      return netshiftStage1BlockLegacyInventoryWrite('This software entry has no canonical server record.');
+    } else if (type === 'userFolder') {
+      const folder = (state.userFoldersV2 || []).find(item => item.name === key && item._coreFolderId);
+      if (!folder) return netshiftStage1BlockLegacyInventoryWrite('This folder has no server record.');
+      return netshiftCoreShowFolderMenu({ preventDefault(){}, stopPropagation(){}, clientX:10, clientY:10 }, folder._coreFolderId);
+    } else if (type === 'recycleFile') {
+      const entry = state.recycleBin[Number(key)];
+      if (!entry?._coreFileId) return netshiftStage1BlockLegacyInventoryWrite('This Recycle Bin entry has no server record.');
+      if (action === 'restore') return restoreRecycleV16(Number(key));
+      if (action === 'delete') return permanentlyDeleteRecycleV16(Number(key));
+    }
+  }
+  return netshiftStage1PreviousContextAction(action, type, site, key, ...args);
+};
+
+var netshiftStage1PreviousDropOnFolder = dropOnFolderV16;
+dropOnFolderV16 = function(event, folder, ...args) {
+  const payload = state.dragPayloadV16;
+  if (window.NETSHIFT_USER && payload && !['coreFile', 'coreSoftware', 'coreFolder'].includes(payload.type)) {
+    event?.preventDefault?.();
+    state.dragPayloadV16 = null;
+    return netshiftStage1BlockLegacyInventoryWrite('Only server-backed files and software can be moved for a signed-in account.');
+  }
+  return netshiftStage1PreviousDropOnFolder(event, folder, ...args);
+};
+
+var netshiftStage1PreviousRestoreRecycle = restoreRecycleV16;
+restoreRecycleV16 = function(index, ...args) {
+  if (window.NETSHIFT_USER) {
+    const entry = state.recycleBin[Number(index)];
+    if (!entry?._coreFileId) return netshiftStage1BlockLegacyInventoryWrite('This Recycle Bin entry is not server-backed.');
+  }
+  return netshiftStage1PreviousRestoreRecycle(index, ...args);
+};
+
+var netshiftStage1PreviousPermanentDeleteRecycle = permanentlyDeleteRecycleV16;
+permanentlyDeleteRecycleV16 = function(index, ...args) {
+  if (window.NETSHIFT_USER) {
+    const entry = state.recycleBin[Number(index)];
+    if (!entry?._coreFileId) return netshiftStage1BlockLegacyInventoryWrite('This Recycle Bin entry is not server-backed.');
+  }
+  return netshiftStage1PreviousPermanentDeleteRecycle(index, ...args);
+};
+
+var netshiftStage1PreviousEmptyRecycleBin = emptyRecycleBinV16;
+emptyRecycleBinV16 = async function(...args) {
+  if (!window.NETSHIFT_USER) return netshiftStage1PreviousEmptyRecycleBin(...args);
+  const ids = (state.recycleBin || []).filter(entry => entry?._coreFileId && entry?._coreItemType !== 'folder');
+  if (!ids.length) return netshiftStage1BlockLegacyInventoryWrite('There are no server-backed files or software to permanently delete. Folders must be handled individually.');
+  let deleted = 0, failed = 0;
+  for (const entry of ids) {
+    try {
+      await netshiftApi('/api/core/files/' + encodeURIComponent(entry._coreFileId) + '/permanent', { method: 'DELETE' });
+      deleted += 1;
+    } catch (_) { failed += 1; }
+  }
+  try { await netshiftCoreLoadFiles({ quiet: true, required: true }); }
+  catch (error) { toast('Recycle Bin updates were sent but the view could not refresh: ' + error.message); return; }
+  toast(failed ? `Permanently deleted ${deleted} item(s); ${failed} could not be deleted.` : `Permanently deleted ${deleted} item(s).`);
+};
+
+// Keep unauthoritative compatibility mirrors clean even if an old timer or event callback
+// writes to them. Authenticated renderers and software checks above ignore these entries.
+function netshiftStage1InventoryFenceActive() { return !!window.NETSHIFT_USER; }
 
 </script></body></html>
