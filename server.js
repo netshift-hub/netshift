@@ -17,6 +17,8 @@ const { applyLegacySaveCutover, isRetiredLegacySave } = require('./lib/legacy-sa
 const { validateSaveRequest, normaliseStoredSave } = require('./lib/save-protocol');
 const { HostDownloadClaimError, assertHostSlug, assertHostItemId, normaliseHostStock, publicHostStockItem, claimHostDownload } = require('./lib/host-download-claim');
 const { createGeneratedHostLoot, regenerateHostStock } = require('./lib/host-loot-regeneration');
+const { initialiseEconomyLedgerSchema } = require('./lib/economy-ledger-schema');
+const { BankTransferError, normaliseBankTransferRequest, transferFirstBankFunds } = require('./lib/bank-transfer');
 
 const isProduction = process.env.NODE_ENV === 'production';
 const PORT = Number(process.env.PORT || 3000);
@@ -266,6 +268,10 @@ async function initialiseDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
+  // E1: install the append-only economy journals after their base account/world tables exist.
+  // This migration is additive and does not touch legacy saves or existing account data.
+  await initialiseEconomyLedgerSchema(pool);
+
   // First-time SafetyShield change is allowed immediately; the one-hour cooldown
   // begins only after the player actually changes the default ON setting.
   await pool.query(`ALTER TABLE netshift_player_world
@@ -576,6 +582,13 @@ const bankLoginLimiter = rateLimit({
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { error: 'Too many First Bank sign-in attempts. Please wait 15 minutes and try again.' }
+});
+const bankTransferLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 12,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'First Bank transfer limit reached. Please wait a moment.' }
 });
 const worldProbeLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -1246,6 +1259,71 @@ app.get('/api/core/bank/account', requireAuth, async (req, res, next) => {
       username: account.account_username, balance: Number(account.balance_cents) / 100, currency: 'USD' } });
   } catch (e) { next(e); }
 });
+// E2: account-to-account transfers use row locks, the immutable money ledger,
+// and the existing server-owned balance projection in one PostgreSQL transaction.
+app.get('/api/core/bank/transfers', requireAuth, async (req, res, next) => {
+  try {
+    if (!await requireSessionOwnership(req, res)) return;
+    if (req.session.bankAuthenticatedFor !== String(req.session.user.id))
+      return res.status(401).json({ error: 'Sign in to First Bank to view transfer history.', code: 'BANK_AUTH_REQUIRED' });
+    const accountResult = await pool.query(`SELECT id FROM netshift_bank_accounts
+      WHERE owner_user_id=$1 AND is_player=TRUE AND password_hash IS NOT NULL`, [req.session.user.id]);
+    if (!accountResult.rowCount) return res.status(409).json({ error: 'Complete First Bank setup before viewing transfers.', code: 'BANK_SETUP_REQUIRED' });
+    const accountId = accountResult.rows[0].id;
+    const result = await pool.query(`SELECT tx.id, tx.created_at, p.amount_cents,
+        CASE WHEN p.amount_cents < 0 THEN 'sent' ELSE 'received' END AS direction,
+        CASE WHEN p.amount_cents < 0 THEN tx.metadata->>'recipientAccountNumber'
+             ELSE tx.metadata->>'senderAccountNumber' END AS counterparty_account_number,
+        COALESCE(tx.metadata->>'reference','') AS reference
+      FROM netshift_money_transactions tx
+      JOIN netshift_money_postings p ON p.transaction_id=tx.id
+      WHERE tx.transaction_type='player_transfer' AND p.bank_account_id=$1
+      ORDER BY tx.created_at DESC, tx.id DESC LIMIT 20`, [accountId]);
+    res.json({ transfers: result.rows.map(row => ({
+      id: row.id, createdAt: row.created_at,
+      direction: row.direction,
+      amountCents: String(row.amount_cents).startsWith('-') ? -Number(row.amount_cents) : Number(row.amount_cents),
+      counterpartyAccountNumber: row.counterparty_account_number || 'Account unavailable',
+      reference: row.reference
+    })) });
+  } catch (error) { next(error); }
+});
+
+app.post('/api/core/bank/transfers', bankTransferLimiter, requireAuth, async (req, res, next) => {
+  try {
+    if (!await requireSessionOwnership(req, res)) return;
+    if (req.session.bankAuthenticatedFor !== String(req.session.user.id))
+      return res.status(401).json({ error: 'Sign in to First Bank before sending money.', code: 'BANK_AUTH_REQUIRED' });
+    let transferRequest;
+    try { transferRequest = normaliseBankTransferRequest(req.body); }
+    catch (error) {
+      if (error instanceof BankTransferError) return res.status(error.status).json({ error: error.message, code: error.code });
+      throw error;
+    }
+    const client = await pool.connect();
+    try {
+      const result = await transferFirstBankFunds(client, {
+        senderUserId: String(req.session.user.id),
+        ...transferRequest
+      });
+      res.json({
+        ok: true,
+        transactionId: result.transactionId,
+        duplicate: result.duplicate,
+        senderBalance: result.senderBalanceCents / 100,
+        recipientAccountNumber: result.recipientAccountNumber,
+        message: result.duplicate ? 'This transfer was already processed; it was not sent a second time.' : 'Transfer completed successfully.'
+      });
+    } finally { client.release(); }
+  } catch (error) {
+    if (error instanceof BankTransferError || (Number.isInteger(error.status) && typeof error.code === 'string')) {
+      return res.status(error.status).json({ error: error.message, code: error.code });
+    }
+    if (error.code === 'IDEMPOTENCY_KEY_REUSED') return res.status(409).json({ error: error.message, code: error.code });
+    next(error);
+  }
+});
+
 app.post('/api/core/bank/logout', requireAuth, async (req, res, next) => {
   try {
     if (!await requireSessionOwnership(req, res)) return;

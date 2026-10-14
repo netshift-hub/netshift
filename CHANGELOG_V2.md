@@ -129,3 +129,18 @@
 - Added `scripts/check-stage1-acceptance.js` to the standard deterministic suite to verify test coverage/wiring for legacy-save safety, authenticated hydration, canonical inventory/legacy fencing, atomic claims/loot rules, cross-account evidence and release sign-off.
 - Added opt-in `scripts/test-stage1-postgres.js` for real PostgreSQL host-claim commit, filename-conflict rollback, simultaneous single-winner claims, revoked/non-controller access and consumed-ID replay. It requires a dedicated `NETSHIFT_STAGE1_TEST_DATABASE_URL`, explicit disposable-database acknowledgement, refuses Render hosts, and creates/drops only a uniquely named isolated schema.
 - Expanded the staging checklist and ownership audit with T1–T6 evidence mapping and explicit PASS/FAIL/BLOCKED rules. PostgreSQL and browser/staging checks remain pending until actually executed; this chunk does not sign off Stage 1.
+
+
+## Economy implementation — E1 append-only ledger foundation (local candidate)
+- Added an immutable double-entry money journal using integer cents, idempotency keys, request fingerprints, and deferred PostgreSQL constraints that reject any transaction with fewer than two postings or a non-zero total.
+- Added immutable asset-provenance events linked to money transactions, plus database triggers that reject direct updates/deletes instead of allowing history to be silently rewritten. Historical actor/owner/account IDs are snapshots, so later user/account deletion does not cascade through the ledgers.
+- Registered the existing `hack3rw4re.net` and `computerstore.net` storefronts as separate website merchants with separate treasury system accounts. The `netshift_website_income_summary` view derives gross receipts and net treasury balance from postings, so future website sales can be attributed per site. No income is invented before a server-authoritative sale occurs.
+- Added fast deterministic E1 checks to `npm run check` and an opt-in disposable-database integration command `npm run test:economy:postgres`. PostgreSQL testing remains pending until a dedicated test database is configured. E1 deliberately adds no purchase/transfer endpoints and does not claim the economy is live.
+
+
+## Economy E2 — First Bank player transfers (local candidate, 2026-10-14)
+- Added a server-authoritative transfer service. Source and recipient player bank rows are locked in ascending account-ID order; the service records opening-balance baselines where required, writes one immutable `player_transfer` transaction with balanced integer-cent postings, debits the source and credits the recipient atomically.
+- Added authenticated `POST /api/core/bank/transfers` and `GET /api/core/bank/transfers` endpoints. Transfers require current NETSHIFT session ownership and a separate First Bank authenticated session. Recipient accounts must be active player accounts that completed First Bank setup; self-transfers and insufficient funds are rejected.
+- Added decimal-to-cents validation (no exponent or fractional-cent amounts), bounded references, sender-scoped idempotency keys, safe retry responses, and transfer history showing only each account's own transfer rows and counterparty account numbers.
+- Connected the server-backed First Bank UI to transfer sending and recent activity; the UI retains the same idempotency key for unchanged requests after connection failures.
+- Extended deterministic checks and the opt-in isolated PostgreSQL integration suite for atomic balance/ledger updates, retries, insufficient funds, self-transfer, unactivated recipients and concurrent overspend. `npm run check` passes locally. PostgreSQL tests skip safely without `NETSHIFT_ECONOMY_TEST_DATABASE_URL`; no live DB, GitHub or Render operation was performed.

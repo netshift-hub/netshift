@@ -92,6 +92,19 @@ The chunks are small by design. A locally passing static suite does not establis
 
 **Gate:** balance cannot be altered via DevTools or `/api/save`; no negative/duplicated money under concurrent actions; NPC loot cannot expose/modify any player's actual First Bank account.
 
+## Economy implementation chunks (E1–E6)
+
+| Chunk | Scope | Status / gate |
+|---|---|---|
+| E1 | Append-only double-entry money journal, asset provenance journal, website merchant treasury attribution and derived income reporting | Implemented in local candidate; disposable PostgreSQL schema/constraint tests and review pending. |
+| E2 | First Bank player transfers, authenticated transfer history, atomic balance updates, idempotency and concurrency control | Implemented in local candidate. `npm run check` passes; PostgreSQL and browser/two-account staging checks remain pending. |
+| E3 | Server-authoritative freeware and paid software acquisition, purchase-to-money-ledger linkage, asset delivery and legacy shop fencing | Next; not yet implemented. |
+| E4 | Integrate Password Cracker, Waterwall and intrusion prerequisites with server-side installed-software checks and authoritative shared-world outcomes | High priority after E3; not yet implemented. |
+| E5 | Complete canonical file/software ownership-event coverage, gifts and optional paid trades with atomic money+asset exchange | Not yet implemented. |
+| E6 | Migrate upgrades, subscriptions, rewards, Warez cashout and other economy sources/sinks individually; remove unsupported browser-authoritative money changes | Not yet implemented. |
+
+Every transfer, purchase, reward or sale must be one database transaction: lock/validate the relevant authoritative rows, update the materialized balance/ownership state, insert a balanced money transaction and the linked asset event where applicable, then commit. Retries use idempotency keys. A failed event must leave no partial balance or ownership change. Website income remains attributed to each merchant's own treasury; future earning mechanics must be based on posted sale events, not visits or attempted purchases.
+
 ## Phase 5 — Shared PC records and PvP resolution
 
 - Maintain a shared server-side access/admin log per workstation. Every player sees the same target log unless it has been deleted under game rules; two players accessing the PC close together must see both visits in the correct order.
@@ -211,3 +224,19 @@ Build email on the server-side identity, file and malware foundations, not as an
 - Legacy context actions, drag/drop, local-file opening and Recycle Bin actions are fenced. Canonical restore/permanent-delete and bulk deletion use the existing owner-scoped Core file API; folders remain excluded from bulk permanent deletion because atomic subtree handling is not implemented.
 - Added `scripts/check-stage1-legacy-inventory-fence.js` to `npm run check` and updated the canonical-inventory regressions for the new canonical-only policy.
 - Validation is local static/helper validation only. PostgreSQL, browser, two-account staging and deployed behavior remain unverified. This chunk intentionally does not migrate banking/economy, malware, attack outcomes, hardware upgrades or admin MFA. Do not declare Stage 1 complete; Chunk 10 and staging acceptance remain outstanding.
+
+
+## Economy roadmap — bounded follow-on chunks (approved 2026-10-14)
+
+Legacy browser-era player progress is disposable at launch. Protected state must nevertheless become server-authoritative during development; it must not be reconciled from localStorage/browser snapshots. The live/staging database is not to be reset as part of feature implementation. Provision a fresh production database for the eventual launch.
+
+| Chunk | Scope | Exit gate |
+|---|---|---|
+| E1 | Append-only double-entry money postings, idempotency/request hashes, append-only asset provenance, per-website treasury accounts and income summary view. | Fast suite passes and disposable PostgreSQL tests prove commit-time balance enforcement, replay handling, append-only enforcement and per-merchant income reporting. |
+| E2 | First Bank player-to-player transfers using the ledger and atomic materialised balance updates. | Real PostgreSQL success/rollback/concurrency/retry tests and two-account staging verification. |
+| E3 | Server-backed freeware and paid software acquisition; website sale postings credited to the relevant merchant treasury; remove legacy signed-in purchase paths. | Funds, stock/ownership, treasury income and asset journal commit together; no duplicate charge/delivery. |
+| E4 | Server-authoritative Password Cracker and Waterwall flow, validating owned installed software/version and resolving breach state centrally. | Two-account browser tests demonstrate correct prerequisite/tool denial and server-confirmed results after refresh. |
+| E5 | Complete asset provenance and atomic paid trades; asset and money movement linked by one transaction. | No item duplication or partial transfer; audit history reconciles to current ownership. |
+| E6 | Migrate hardware, subscriptions, NPC/mission rewards, cashout, theft and other money sources/sinks individually. | Every money-changing action has an approved server-side source/sink and a balanced ledger transaction; unsupported surfaces remain disabled until then. |
+
+Website income is attributed by merchant key, not pooled into a generic software-store figure. Current known storefronts are `hack3rw4re.net` and `computerstore.net`; E1 defines accounting identities only. Income can later fund player earnings/rewards, but no player should receive revenue until a specific earning rule is designed and executed atomically.

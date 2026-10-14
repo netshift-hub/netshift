@@ -142,3 +142,8 @@ No new production secret or environment variable is required for v1.3. The new o
 - Chat event: `world:chat-send`, rate-limited per account, persisted and broadcast to the shared lobby.
 
 The shared-world event stream exposes usernames and simulated actions only; it does not expose session IDs, emails, real IP addresses or private game saves. The `chancePercent` returned by a breach response is informational; the client cannot submit its own result or success roll.
+
+
+## Economy E1/E2 implementation status
+
+The current local candidate includes the E1 accounting journal and E2 First Bank transfer service. Transfers require a setup First Bank account and authenticated bank session, write balanced integer-cent postings, update both balances within one PostgreSQL transaction, and support idempotent retries. The UI also displays per-account transfer history. This is not yet staging-verified: run `npm run check`, then `npm run test:economy:postgres` using a separate disposable test database, and perform the two-account staging checklist before enabling wider economy play. Paid software purchases, website sales, upgrades, player rewards and Warez cashout remain later chunks and must not be treated as ledger-backed until implemented.

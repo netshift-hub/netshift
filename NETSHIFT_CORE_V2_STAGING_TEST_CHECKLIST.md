@@ -68,7 +68,22 @@ fetch('/api/core/profile').then(async r => {
 });
 ```
 
-Never paste bank passwords, session cookies or other credentials into reports. **Transfers remain deliberately disabled** in this preview until the server-side transfer/ledger implementation is added; do not test legacy local demo transfers as if they were persistent.
+Never paste bank passwords, session cookies or other credentials into reports. E2 adds a server-backed transfer endpoint to the local candidate; the tests below remain pending until that candidate is deployed to a verified staging service. Do not treat the legacy local demo bank as a real account.
+
+### D1. First Bank transfers (E2 implementation; runtime validation pending)
+
+Use two disposable player accounts that have completed First Bank setup. Record only account labels A/B and redacted account numbers in test evidence.
+
+- [ ] An unauthenticated player-bank session cannot submit a transfer or read transfer history (`401 BANK_AUTH_REQUIRED`).
+- [ ] The signed-in account can transfer a valid amount to another active, fully set-up player account using its eight-digit account number.
+- [ ] The sender balance decreases and the recipient balance increases by exactly the same integer-cent amount; both changes and the two balanced ledger postings commit together.
+- [ ] An exact retry using the same idempotency key returns the original transfer and does not debit/credit again. Reusing a key with changed destination, amount or reference is rejected.
+- [ ] Insufficient funds, self-transfer, unactivated/unknown destination, invalid amount (including fractions of a cent) and invalid reference do not change either balance or leave a money transaction behind.
+- [ ] Two concurrent transfers that collectively exceed the available balance cannot overspend; account row locks use a stable account-ID order.
+- [ ] Sent and received transfers appear in the appropriate account's recent transfer history with amount, counterparty account number, reference and timestamp. History for one account does not expose the other account's balance, username or unrelated transactions.
+- [ ] Sender and recipient can refresh/relogin and see the same balances and transfer history.
+
+The deterministic checker covers amount parsing, route/auth wiring and UI wiring. `npm run test:economy:postgres` includes real PostgreSQL cases for balance updates, ledger consistency, exact retry, insufficient funds, self-transfer, inactive destination and concurrent overspend; it must be run against a disposable test database before E2 sign-off. Browser/two-account tests are separate and must be run on staging.
 
 ## E. Player-file API ownership
 
