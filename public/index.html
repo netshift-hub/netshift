@@ -222,7 +222,7 @@
       <div class="banner">NETSHIFT // ONLINE ACCESS</div>
       <p class="account-small">Create an account to save your workstation and game progress online. Your account is separate from the fictional bank logins inside the game.</p>
       <div id="authMessage" class="account-message" role="status" aria-live="polite" hidden></div>
-      <form id="loginForm" class="account-form" autocomplete="on">
+      <form id="loginForm" class="account-form" autocomplete="on" method="post" action="/" onsubmit="return false">
         <h2>Sign in to your NETSHIFT ID</h2>
         <label for="loginUsername">Username</label>
         <input id="loginUsername" name="username" autocomplete="username" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_]+" spellcheck="false">
@@ -231,7 +231,7 @@
         <button class="bevel" type="submit">Connect</button>
         <p class="account-small">New to the network? <button class="account-link" type="button" onclick="showAccountForm('register')">Create an account</button></p>
       </form>
-      <form id="registerForm" class="account-form" autocomplete="on" hidden>
+      <form id="registerForm" class="account-form" autocomplete="on" hidden method="post" action="/" onsubmit="return false">
         <h2>Register a NETSHIFT ID</h2>
         <label for="registerUsername">Username (3–20 letters, digits or underscores)</label>
         <input id="registerUsername" name="username" autocomplete="username" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_]+" spellcheck="false">
@@ -4800,6 +4800,12 @@ function adminLogoutV16(site){
  renderFrontV16(site);
 }
 
+// Initialise canonical inventory mirrors before any boot-time desktop render.
+let NETSHIFT_CORE_FILES = [];
+let NETSHIFT_CORE_SOFTWARE = [];
+let NETSHIFT_CORE_FOLDERS = [];
+let NETSHIFT_CORE_RECYCLE_FILES = [];
+
 if(!activeBrowserSurfaceV16) initBrowserTabsV16();
 updateDesktopShortcutsV16();
 refreshDesktopIcons();
@@ -5938,10 +5944,6 @@ async function netshiftBankLogout() {
 // Core v2 canonical file/desktop integration. The browser arrays below are mirrors only:
 // each canonical item retains its server record ID, type and parent path so views/actions
 // cannot accidentally substitute a legacy row with the same visible filename.
-let NETSHIFT_CORE_FILES = [];
-let NETSHIFT_CORE_SOFTWARE = [];
-let NETSHIFT_CORE_FOLDERS = [];
-let NETSHIFT_CORE_RECYCLE_FILES = [];
 function netshiftCoreFolderLocation(parentPath) {
   const path = typeof parentPath === 'string' && parentPath ? parentPath : '/';
   if (path === '/' || path === '/desktop') return 'desktop';
